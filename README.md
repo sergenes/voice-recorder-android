@@ -3,8 +3,6 @@ A dictaphone app where users can record and log short voice messages. The app ke
 recordings so users can play them later.
 
 # Scope
-There’s a lot you could build in this so here are some indication to make the exercise simpler:
-
 - The app is all local, no need for authentication or storing anything in the cloud
 - Limit recordings to 60 seconds so you don’t need to deal with large files
 - Recordings play continuously: when a user plays a recording, it will automatically play the
