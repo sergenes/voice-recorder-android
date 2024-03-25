@@ -22,7 +22,7 @@ I used standard default colors throughout the project.
 I reused components from previous projects, making minor updates:
 
 1. The Record/Stop button [RecordButton](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/components/RecordButton.kt), which includes a circle gauge indicating the time
-   remaining until the end of recording (capped at 1 minute - can be updated in Config).
+   remaining until the end of recording (capped at 1 minute - can be updated in [Config](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/app/Config.kt)).
 
 2. To avoid making the screen too busy, I introduced two list item view components. The regular
    item (ItemView) displays only the time of recording, while the selected item allows users to play
