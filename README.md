@@ -18,6 +18,6 @@ Example of one screen app created from the standard Android Studio Template (Emp
 project demonstrate Compose UI alongside with separation of code into a View, ViewModel, and
 Repository.
 
-         Initial Screen         |  A few recording added
-:------------------------------:|:-------------------------:
+Initial Screen             |  A few recording added
+:-------------------------:|:-------------------------:
 ![Image](Screenshot_1.webp)     |  ![Image](Screenshot_2.webp)
