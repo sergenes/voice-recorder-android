@@ -35,9 +35,9 @@ loading the history of recordings from the disk and deleting audio files if nece
 I did not introduce Hilt for dependency injection and Timber as a logger, which I usually include in
 my projects. However, I did try to handle most possible edge cases and errors.
 
-       Initial Screen       | A few recording added
-:--------------------------:|:-------------------------:
- ![Image](Screenshot_1.png) | ![Image](Screenshot_2.png)
+Initial Screen  | A few recording added
+:-------------------------:|:-------------------------:
+![Image](Screenshot_1.png) | ![Image](Screenshot_2.png)
 
 Contact
 =================================
