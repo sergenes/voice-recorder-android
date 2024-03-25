@@ -20,4 +20,4 @@ Repository.
 
 Initial Screen             |  A few recording added
 :-------------------------:|:-------------------------:
-![Image](Screenshot_1.webp)     |  ![Image](Screenshot_2.webp)
+![Image](Screenshot_1.png)     |  ![Image](Screenshot_2.png)
