@@ -19,6 +19,5 @@ project demonstrate Compose UI alongside with separation of code into a View, Vi
 Repository.
 
          Initial Screen         |  A few recording added
-
 :------------------------------:|:-------------------------:
 ![Image](Screenshot_1.webp)     |  ![Image](Screenshot_2.webp)
