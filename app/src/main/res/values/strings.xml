@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Story Rec</string>
+    <string name="there_are_no_recordings_yet">There are no recordings yet</string>
+    <string name="allow_access_to_the_microphone">Allow access to the microphone</string>
+    <string name="cancel">Cancel</string>
+    <string name="please_confirm_deleting">Please confirm deleting</string>
+    <string name="are_you_sure_you_can_not_undo_this_action">Are you sure?\nYou can not undo this action!</string>
+    <string name="yes">Yes</string>
+</resources>
