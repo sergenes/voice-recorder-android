@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import com.sergey.nes.recorder.app.formatSecondsToHMS
-import com.sergey.nes.recorder.models.RecordingItem
 import com.sergey.nes.recorder.ui.theme.StoryRecTheme
 import com.sergey.nes.recorder.ui.theme.noSpace
 import com.sergey.nes.recorder.ui.theme.normalRadius
@@ -42,7 +41,7 @@ import com.sergey.nes.recorder.ui.theme.smallSpace
 @Composable
 fun SelectedMessageView_Preview() {
     StoryRecTheme {
-        SelectedItemView(message = "3/3/2024 11:24 AM")
+        SelectedItemView(title = "3/3/2024 11:24 AM")
     }
 }
 
@@ -50,14 +49,14 @@ fun SelectedMessageView_Preview() {
 @Composable
 fun RegularMessageView_Preview() {
     StoryRecTheme {
-        ItemView(RecordingItem(dateTime = "3/3/2024 11:24 AM"), onSelect = {})
+        ItemView(title = "3/3/2024 11:24 AM", onSelect = {})
     }
 }
 
 @Composable
 fun SelectedItemView(
     modifier: Modifier = Modifier,
-    message: String,
+    title: String,
     speaking: Boolean = false,
     audioLength: Int = 0,
     audioPlayback: Float = 0f,
@@ -112,7 +111,9 @@ fun SelectedItemView(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary
                                 ),
-                                modifier = Modifier.fillMaxWidth().padding(end = normalSpace)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(end = normalSpace)
                             )
                             Row {
                                 Text(
@@ -145,7 +146,7 @@ fun SelectedItemView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            message,
+                            title,
                             color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleMedium,
                         )
@@ -170,7 +171,7 @@ fun SelectedItemView(
 
 @Composable
 fun ItemView(
-    item: RecordingItem,
+    title: String,
     onSelect: () -> Unit
 ) {
     val surface = MaterialTheme.colorScheme.primaryContainer
@@ -189,7 +190,7 @@ fun ItemView(
             Column(Modifier.weight(1f)) {
                 Box(modifier = Modifier.padding(normalSpace)) {
                     Text(
-                        item.dateTime,
+                        title,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )

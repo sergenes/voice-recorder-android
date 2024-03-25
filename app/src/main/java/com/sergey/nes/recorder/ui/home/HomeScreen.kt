@@ -40,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import com.sergey.nes.recorder.R
+import com.sergey.nes.recorder.app.Config
 import com.sergey.nes.recorder.app.MainActivityInterface
 import com.sergey.nes.recorder.app.Config.RECORDING_DURATION
 import com.sergey.nes.recorder.ui.components.ItemView
@@ -51,6 +52,7 @@ import com.sergey.nes.recorder.tools.AudioRecorder
 import com.sergey.nes.recorder.ui.theme.StoryRecTheme
 import com.sergey.nes.recorder.ui.theme.normalSpace
 import kotlinx.coroutines.launch
+import java.util.Date
 
 class MainActivityForPreview : MainActivityInterface {
     override fun micPermissions(): Boolean {
@@ -189,7 +191,7 @@ fun HomeScreenView(
                     confirmButton = {
                         TextButton(onClick = {
                             viewModel.onDialogDismiss()
-                            viewModel.deleteRecording{
+                            viewModel.deleteRecording {
                                 activity.showErrorMessage(it)
                             }
                         })
@@ -250,9 +252,12 @@ fun HomeViewContent(
                     LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                         items(recordings.size) { index ->
                             val item = recordings[index]
+                            val title = Config.DATE_TIME_FORMAT.format(
+                                Date(item.dateTime)
+                            )
                             if (selectedIndex == index) {
                                 SelectedItemView(
-                                    message = item.dateTime,
+                                    title = title,
                                     speaking = isPlaying,
                                     audioLength = audioLength,
                                     audioPlayback = audioPlayback,
@@ -261,10 +266,9 @@ fun HomeViewContent(
                                     onSliderValueChange = onSliderValueChange
                                 )
                             } else {
-                                ItemView(item,
-                                    onSelect = {
-                                        onSelected(index)
-                                    })
+                                ItemView(title = title, onSelect = {
+                                    onSelected(index)
+                                })
                             }
                         }
                     }
