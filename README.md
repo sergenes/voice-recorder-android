@@ -25,5 +25,4 @@ Initial Screen  | A few recording added
 
 Contact
 =================================
-Try to contact me if you have any questions at serge.nes @ gmail.com. Also, follow me on
-LinkedIn: https://www.linkedin.com/in/sergey-neskoromny-86662a10/
+Try to contact me and follow on LinkedIn: https://www.linkedin.com/in/sergey-neskoromny-86662a10/
