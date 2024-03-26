@@ -160,16 +160,16 @@ fun HomeScreenView(
             },
             onRecordingStopped = {
                 audioRecorder?.stop()?.let {
-                    viewModel.onLoad(ready = {
-                        if (it.recordings.isNotEmpty()) {
+                    viewModel.saveInfo(it, ready = { dataSource ->
+                        if (dataSource.recordings.isNotEmpty()) {
                             viewModel.selectRecording(0, audioPlayer)
                             viewModel.updatePlaying(false)
                             coroutineScope.launch {
                                 listState.animateScrollToItem(0)
                             }
                         }
-                    }, onError = {
-                        activity.showErrorMessage(it)
+                    }, onError = { error ->
+                        activity.showErrorMessage(error)
                     })
                 }
             },

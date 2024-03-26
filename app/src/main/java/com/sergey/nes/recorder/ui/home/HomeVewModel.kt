@@ -40,6 +40,24 @@ class HomeVewModel(
     val dataSource: StateFlow<DataSourceState>
         get() = _dataSource
 
+    fun saveInfo(recording: RecordingItem, ready: (DataSourceState) -> Unit, onError: (String) -> Unit) =
+        viewModelScope.launch {
+            repository.saveRecordingInfo(recording).collect { result ->
+                result.fold(
+                    onSuccess = {
+                        onLoad(ready, onError)
+                    },
+                    onFailure = { throwable ->
+                        throwable.localizedMessage?.let {
+                            onError(it)
+                        } ?: run {
+                            onError("Unknown Error")
+                        }
+                    }
+                )
+            }
+        }
+
     fun onLoad(ready: (DataSourceState) -> Unit, onError: (String) -> Unit) =
         viewModelScope.launch {
             repository.getRecordings().collect { result ->
@@ -65,7 +83,7 @@ class HomeVewModel(
         val index = _dataSource.value.selectedIndex
         if (index in 0.._dataSource.value.recordings.lastIndex) {
             val item = _dataSource.value.recordings[index]
-            repository.deleteRecording(item.id.toString()).collect { result ->
+            repository.deleteRecording(item.id).collect { result ->
                 result.fold(
                     onSuccess = {
                         onLoad(ready = {
