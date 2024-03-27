@@ -135,8 +135,13 @@ class AudioRecorder(private val context: Context) {
 
         createRecorder().apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+//            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+//            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            // Set output format to WAV
+            setOutputFormat(MediaRecorder.OutputFormat.AMR_NB)
+
+            // Set audio encoder
+            setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
             setOutputFile(FileOutputStream(outputFile).fd)
 
             prepare()

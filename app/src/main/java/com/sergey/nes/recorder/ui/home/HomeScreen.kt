@@ -13,16 +13,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,8 +41,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sergey.nes.recorder.R
 import com.sergey.nes.recorder.app.Config
 import com.sergey.nes.recorder.app.MainActivityInterface
@@ -48,9 +58,9 @@ import com.sergey.nes.recorder.ui.components.RecordButton
 import com.sergey.nes.recorder.ui.components.SelectedItemView
 import com.sergey.nes.recorder.models.RecordingItem
 import com.sergey.nes.recorder.tools.AudioPlayer
-import com.sergey.nes.recorder.tools.AudioRecorder
 import com.sergey.nes.recorder.ui.theme.StoryRecTheme
 import com.sergey.nes.recorder.ui.theme.normalSpace
+import com.sergey.nes.recorder.whispertflite.asr.WAVRecorder
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -70,7 +80,7 @@ fun GreetingPreview() {
     StoryRecTheme {
         HomeScreenView(
             MainActivityForPreview(),
-            HomeVewModel(HomeRepository()),
+            HomeVewModel(HomeRepository(), null),
             null,
             null
         )
@@ -82,7 +92,7 @@ fun HomeScreenView(
     activity: MainActivityInterface,
     viewModel: HomeVewModel,
     audioPlayer: AudioPlayer?,
-    audioRecorder: AudioRecorder?
+    audioRecorder: WAVRecorder?
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -106,6 +116,7 @@ fun HomeScreenView(
     val audioLength = audioPlayer?.audioLength?.value ?: 0
     val audioPlayback = audioPlayer?.audioPlayback?.value ?: 0f
     val showDialog = viewModel.showDialog.collectAsState().value
+    val transcribing = viewModel.transcribing.collectAsState().value
 
     LaunchedEffect("Init") {
         viewModel.onLoad(ready = {
@@ -175,6 +186,15 @@ fun HomeScreenView(
             },
             onSliderValueChange = {
                 audioPlayer?.updateAudioPlayback(it)
+            },
+            transcribing = transcribing,
+            onTranscribe = {
+                viewModel.transcribe {
+                    activity.showErrorMessage(it)
+                }
+            },
+            onShare = {
+
             }
         )
         if (showDialog) {
@@ -228,6 +248,9 @@ fun HomeViewContent(
     onRecordingStarted: (Boolean) -> Unit,
     onRecordingStopped: () -> Unit,
     onSliderValueChange: (Float) -> Unit = {},
+    transcribing: Boolean = false,
+    onTranscribe: () -> Unit = {},
+    onShare: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -249,24 +272,52 @@ fun HomeViewContent(
                 if (recordings.isEmpty()) {
                     EmptyListMessage()
                 } else {
+                    var query by remember { mutableStateOf(TextFieldValue("")) }
+                    val filteredItems =
+                        recordings.filter { it.transcription.contains(query.text, ignoreCase = true) }
+                    TextField(
+                        value = query,
+                        textStyle = TextStyle(
+                            fontSize = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(),
+                        singleLine = true,
+                        onValueChange = { newQuery -> query = newQuery },
+                        label = { Text("Search") },
+                        modifier = Modifier.semantics {
+                            this.contentDescription = "Search through the conversation history." }
+                            .fillMaxWidth(0.9f)
+                            .background(
+                                MaterialTheme.colorScheme.background,
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = normalSpace)
+                    )
+                    Spacer(modifier = Modifier.height(normalSpace))
                     LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
-                        items(recordings.size) { index ->
-                            val item = recordings[index]
+                        items(filteredItems.size) { index ->
+                            val item = filteredItems[index]
                             val title = Config.DATE_TIME_FORMAT.format(
                                 Date(item.dateTime)
                             )
+                            val transcription = item.transcription
                             if (selectedIndex == index) {
                                 SelectedItemView(
                                     title = title,
+                                    transcription = transcription,
                                     speaking = isPlaying,
                                     audioLength = audioLength,
                                     audioPlayback = audioPlayback,
                                     actionPlay = onPlayClicked,
                                     actionDelete = actionDelete,
-                                    onSliderValueChange = onSliderValueChange
+                                    onSliderValueChange = onSliderValueChange,
+                                    transcribing = transcribing,
+                                    onTranscribe = onTranscribe,
+                                    onShare = onShare
                                 )
                             } else {
-                                ItemView(title = title, onSelect = {
+                                ItemView(title = title, transcription = transcription, onSelect = {
                                     onSelected(index)
                                 })
                             }
