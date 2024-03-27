@@ -69,6 +69,7 @@ public class WaveUtil {
 
             // Get the size of the data section (all PCM data)
             int dataLength = fileInputStream.available(); // byteArrayToInt(header, 40, 4);
+            Log.i(TAG,"fileInputStream.available: " + dataLength);
 
             // Calculate the number of samples
             int bytesPerSample = bitsPerSample / 8;

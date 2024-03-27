@@ -24,7 +24,7 @@
     exit(1);                                                 \
   }
 
-int TFLiteEngine:: loadModel(const char *modelPath, const bool isMultilingual) {
+int TFLiteEngine::loadModel(const char *modelPath, const bool isMultilingual) {
     std::cout << "Entering " << __func__ << "()" << std::endl;
 
     timeval start_time{}, end_time{};
@@ -35,11 +35,11 @@ int TFLiteEngine:: loadModel(const char *modelPath, const bool isMultilingual) {
 
         /////////////// Load filters and vocab data ///////////////
 
-       const char* vocabData = nullptr;
+        const char *vocabData = nullptr;
         if (isMultilingual)
-            vocabData = reinterpret_cast<const char*>(filters_vocab_multilingual);
+            vocabData = reinterpret_cast<const char *>(filters_vocab_multilingual);
         else
-            vocabData = reinterpret_cast<const char*>(filters_vocab_en);
+            vocabData = reinterpret_cast<const char *>(filters_vocab_en);
 
         // Read the magic number
         int magic = 0;
@@ -84,7 +84,7 @@ int TFLiteEngine:: loadModel(const char *modelPath, const bool isMultilingual) {
         }
 
         // add additional vocab ids
-        int n_vocab_additional = 51864; 
+        int n_vocab_additional = 51864;
         if (isMultilingual) {
             n_vocab_additional = 51865;
             g_vocab.token_eot++;
@@ -143,7 +143,8 @@ int TFLiteEngine:: loadModel(const char *modelPath, const bool isMultilingual) {
         g_whisper_tflite.size = size;
         g_whisper_tflite.buffer = buffer;
 
-        g_whisper_tflite.model = tflite::FlatBufferModel::BuildFromBuffer(g_whisper_tflite.buffer, g_whisper_tflite.size);
+        g_whisper_tflite.model = tflite::FlatBufferModel::BuildFromBuffer(g_whisper_tflite.buffer,
+                                                                          g_whisper_tflite.size);
         TFLITE_MINIMAL_CHECK(g_whisper_tflite.model != nullptr);
 
         // Build the interpreter with the InterpreterBuilder.
@@ -159,7 +160,8 @@ int TFLiteEngine:: loadModel(const char *modelPath, const bool isMultilingual) {
         g_whisper_tflite.is_whisper_tflite_initialized = true;
 
         gettimeofday(&end_time, NULL);
-        std::cout << "Time taken for TFLite initialization: " << TIME_DIFF_MS(start_time, end_time) << " ms" << std::endl;
+        std::cout << "Time taken for TFLite initialization: " << TIME_DIFF_MS(start_time, end_time)
+                  << " ms" << std::endl;
     }
 
     std::cout << "Exiting " << __func__ << "()" << std::endl;
@@ -181,12 +183,15 @@ std::string TFLiteEngine::transcribeBuffer(std::vector<float> samples) {
     }
 
     gettimeofday(&end_time, NULL);
-    std::cout << "Time taken for Spectrogram: " << TIME_DIFF_MS(start_time, end_time) << " ms" << std::endl;
+    std::cout << "Time taken for Spectrogram: " << TIME_DIFF_MS(start_time, end_time) << " ms"
+              << std::endl;
 
     if (INFERENCE_ON_AUDIO_FILE) {
         memcpy(g_whisper_tflite.input, mel.data.data(), mel.n_mel * mel.n_len * sizeof(float));
     } else {
-        memcpy(g_whisper_tflite.input, _content_input_features_bin, WHISPER_N_MEL * WHISPER_MEL_LEN * sizeof(float)); // to load pre-generated input_features
+        memcpy(g_whisper_tflite.input, _content_input_features_bin,
+               WHISPER_N_MEL * WHISPER_MEL_LEN *
+               sizeof(float)); // to load pre-generated input_features
     } // end of audio file processing
 
     gettimeofday(&start_time, NULL);
@@ -198,7 +203,8 @@ std::string TFLiteEngine::transcribeBuffer(std::vector<float> samples) {
     }
 
     gettimeofday(&end_time, NULL);
-    std::cout << "Time taken for Interpreter: " << TIME_DIFF_MS(start_time, end_time) << " ms" << std::endl;
+    std::cout << "Time taken for Interpreter: " << TIME_DIFF_MS(start_time, end_time) << " ms"
+              << std::endl;
 
     int output = g_whisper_tflite.interpreter->outputs()[0];
     TfLiteTensor *output_tensor = g_whisper_tflite.interpreter->tensor(output);
@@ -213,7 +219,7 @@ std::string TFLiteEngine::transcribeBuffer(std::vector<float> samples) {
         if (output_int[i] == g_vocab.token_eot) {
             break;
         }
-        
+
         if (output_int[i] < g_vocab.token_eot) {
             text += whisper_token_to_str(output_int[i]);
         }
@@ -223,9 +229,35 @@ std::string TFLiteEngine::transcribeBuffer(std::vector<float> samples) {
 }
 
 std::string TFLiteEngine::transcribeFile(const char *waveFile) {
-	std::vector<float> pcmf32 = readWAVFile(waveFile);
-    pcmf32.resize((WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE), 0);
-    std::string text = transcribeBuffer(pcmf32);
+//    std::vector<float> pcmf32 = readWAVFile(waveFile);
+//    pcmf32.resize((WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE), 0);
+//    std::string text = transcribeBuffer(pcmf32);
+//    return text;
+    // make transcription work for files longer than 30 seconds
+    std::vector<float> pcmf32 = readWAVFile(waveFile);
+    size_t originalSize = pcmf32.size();
+
+    // Determine the number of chunks required to process the entire file
+    size_t totalChunks = (originalSize + (WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE) - 1) /
+                         (WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE);
+
+    std::string text;
+    for (size_t chunkIndex = 0; chunkIndex < totalChunks; ++chunkIndex) {
+        // Extract a chunk of audio data
+        size_t startSample = chunkIndex * WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE;
+        size_t endSample = std::min(startSample + (WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE),
+                                    originalSize);
+        std::vector<float> chunk(pcmf32.begin() + startSample, pcmf32.begin() + endSample);
+
+        // Pad the chunk if it's smaller than the expected size
+        if (chunk.size() < WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE) {
+            chunk.resize(WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE, 0);
+        }
+
+        // Transcribe the chunk and append the result to the text
+        std::string chunkText = transcribeBuffer(chunk);
+        text += chunkText;
+    }
     return text;
 }
 
@@ -233,7 +265,8 @@ void TFLiteEngine::freeModel() {
     std::cout << "Entering " << __func__ << "()" << std::endl;
 
     if (g_whisper_tflite.buffer) {
-        std::cout << __func__ << ": free buffer " << g_whisper_tflite.buffer << " memory" << std::endl;
+        std::cout << __func__ << ": free buffer " << g_whisper_tflite.buffer << " memory"
+                  << std::endl;
         delete[] g_whisper_tflite.buffer;
     }
 

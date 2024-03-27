@@ -29,6 +29,14 @@ class HomeVewModel(
         _showDialog.value = true
     }
 
+    fun deleteTranscriptForTest() {
+        val index = _dataSource.value.selectedIndex
+        val recording = _dataSource.value.recordings[index]
+        saveTranscription("", audioFileId = recording.id) {
+
+        }
+    }
+
     fun onDialogDismiss() {
         _showDialog.value = false
     }

@@ -41,6 +41,7 @@ public class WhisperEngineNative implements IWhisperEngine {
 
     @Override
     public String transcribeFile(String waveFile) {
+        Log.d(TAG, "transcribeFile...");
         return transcribeFile(nativePtr, waveFile);
     }
 

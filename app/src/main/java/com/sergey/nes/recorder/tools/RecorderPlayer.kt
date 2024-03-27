@@ -115,6 +115,7 @@ class AudioPlayer(
     }
 }
 
+@Deprecated("I had to use WAVRecorder, as I wasn't able to record in PCM WAV format.")
 class AudioRecorder(private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var currentItem: RecordingItem? = null
@@ -135,13 +136,8 @@ class AudioRecorder(private val context: Context) {
 
         createRecorder().apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
-//            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-//            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            // Set output format to WAV
-            setOutputFormat(MediaRecorder.OutputFormat.AMR_NB)
-
-            // Set audio encoder
-            setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setOutputFile(FileOutputStream(outputFile).fd)
 
             prepare()

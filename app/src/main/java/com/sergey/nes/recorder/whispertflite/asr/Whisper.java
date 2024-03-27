@@ -24,37 +24,35 @@ public class Whisper {
     public static final String MSG_PROCESSING_DONE = "Processing done...!";
     public static final String MSG_FILE_NOT_FOUND = "Input file doesn't exist..!";
 
-    private final Context mContext;
-    private final AtomicBoolean mInProgress = new AtomicBoolean(false);
-    private final Object mAudioBufferQueueLock = new Object();  // Synchronization object
-    private final Object mWhisperEngineLock = new Object();  // Synchronization object
+    private final Context context;
+    private final AtomicBoolean inProgress = new AtomicBoolean(false);
+    private final Object audioBufferQueueLock = new Object();  // Synchronization object
+    private final Object whisperEngineLock = new Object();  // Synchronization object
     private final Queue<float[]> audioBufferQueue = new LinkedList<>();
-    private Thread mMicTranscribeThread = null;
+    private Thread micTranscribeThread = null;
 
-    // TODO: use WhisperEngine as per requirement
-//    private final IWhisperEngine mWhisperEngine = new WhisperEngine();
-    private final IWhisperEngine mWhisperEngine = new WhisperEngineNative();
+    private final IWhisperEngine whisperEngine = new WhisperEngineNative();
 //    private final IWhisperEngine mWhisperEngine = new WhisperEngineTwoModel();
 
-    private String mAction = null;
-    private String mWavFilePath = null;
-    private Thread mExecutorThread = null;
-    private IWhisperListener mUpdateListener = null;
+    private String action = null;
+    private String wavFilePath = null;
+    private Thread executorThread = null;
+    private IWhisperListener updateListener = null;
 
     private String audioFileId = null;
 
     public Whisper(@Nullable Context context) {
-        mContext = context;
+        this.context = context;
     }
 
     public void setListener(IWhisperListener listener) {
-        mUpdateListener = listener;
-        mWhisperEngine.setUpdateListener(mUpdateListener);
+        updateListener = listener;
+        whisperEngine.setUpdateListener(updateListener);
     }
 
     public void loadModel(String modelPath, String vocabPath, boolean isMultilingual) {
         try {
-            mWhisperEngine.initialize(modelPath, vocabPath, isMultilingual);
+            whisperEngine.initialize(modelPath, vocabPath, isMultilingual);
 
             // Start thread for mic data transcription in realtime
             startMicTranscriptionThread();
@@ -64,41 +62,41 @@ public class Whisper {
     }
 
     public void setAction(String action) {
-        mAction = action;
+        this.action = action;
     }
 
     public void setFilePath(RecordingItem recording) {
         audioFileId = recording.getId();
         String fileName = recording.getId() + "." + Config.FILE_EXTENSION;
-        assert mContext != null;
+        assert context != null;
         File audioFile = new File(
-                mContext.getExternalFilesDir(Config.RECORDINGS_FOLDER),
+                context.getExternalFilesDir(Config.RECORDINGS_FOLDER),
                 fileName
         );
-        mWavFilePath = audioFile.getAbsolutePath();
+        wavFilePath = audioFile.getAbsolutePath();
     }
 
     public void start() {
-        if (mInProgress.get()) {
+        if (inProgress.get()) {
             Log.d(TAG, "Execution is already in progress...");
             return;
         }
 
-        mExecutorThread = new Thread(() -> {
-            mInProgress.set(true);
+        executorThread = new Thread(() -> {
+            inProgress.set(true);
             threadFunction();
-            mInProgress.set(false);
+            inProgress.set(false);
         });
-        mExecutorThread.start();
+        executorThread.start();
     }
 
     public void stop() {
-        mInProgress.set(false);
+        inProgress.set(false);
         try {
-            if (mExecutorThread != null) {
-                mWhisperEngine.interrupt();
-                mExecutorThread.join();
-                mExecutorThread = null;
+            if (executorThread != null) {
+                whisperEngine.interrupt();
+                executorThread.join();
+                executorThread = null;
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -106,26 +104,26 @@ public class Whisper {
     }
 
     public boolean isInProgress() {
-        return mInProgress.get();
+        return inProgress.get();
     }
 
     private void sendUpdate(String message) {
-        if (mUpdateListener != null)
-            mUpdateListener.onUpdateReceived(message);
+        if (updateListener != null)
+            updateListener.onUpdateReceived(message);
     }
 
     private void sendResult(String message) {
-        if (mUpdateListener != null)
-            mUpdateListener.onResultReceived(message, audioFileId);
+        if (updateListener != null)
+            updateListener.onResultReceived(message, audioFileId);
     }
 
     private void threadFunction() {
         try {
             // Get Transcription
-            if (mWhisperEngine.isInitialized()) {
-                Log.d(TAG, "WaveFile: " + mWavFilePath);
+            if (whisperEngine.isInitialized()) {
+                Log.d(TAG, "WaveFile: " + wavFilePath);
 
-                File waveFile = new File(mWavFilePath);
+                File waveFile = new File(wavFilePath);
                 if (waveFile.exists()) {
                     long startTime = System.currentTimeMillis();
                     sendUpdate(MSG_PROCESSING);
@@ -137,8 +135,8 @@ public class Whisper {
 //                        result = mWhisperEngine.getTranslation(mWavFilePath);
 
                     // Get result from wav file
-                    synchronized (mWhisperEngineLock) {
-                        String result = mWhisperEngine.transcribeFile(mWavFilePath);
+                    synchronized (whisperEngineLock) {
+                        String result = whisperEngine.transcribeFile(wavFilePath);
                         sendResult(result);
                         Log.d(TAG, "Result len: " + result.length() + ", Result: " + result);
                     }
@@ -161,19 +159,19 @@ public class Whisper {
 
     // Write buffer in Queue
     public void writeBuffer(float[] samples) {
-        synchronized (mAudioBufferQueueLock) {
+        synchronized (audioBufferQueueLock) {
             audioBufferQueue.add(samples);
-            mAudioBufferQueueLock.notify(); // Notify waiting threads
+            audioBufferQueueLock.notify(); // Notify waiting threads
         }
     }
 
     // Read buffer from Queue
     private float[] readBuffer() {
-        synchronized (mAudioBufferQueueLock) {
+        synchronized (audioBufferQueueLock) {
             while (audioBufferQueue.isEmpty()) {
                 try {
                     // Wait for the queue to have data
-                    mAudioBufferQueueLock.wait();
+                    audioBufferQueueLock.wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -184,14 +182,14 @@ public class Whisper {
 
     // Mic data transcription thread in realtime
     private void startMicTranscriptionThread() {
-        if (mMicTranscribeThread == null) {
+        if (micTranscribeThread == null) {
             // Create a transcribe thread
-            mMicTranscribeThread = new Thread(() -> {
+            micTranscribeThread = new Thread(() -> {
                 while (true) {
                     float[] samples = readBuffer();
                     if (samples != null) {
-                        synchronized (mWhisperEngineLock) {
-                            String result = mWhisperEngine.transcribeBuffer(samples);
+                        synchronized (whisperEngineLock) {
+                            String result = whisperEngine.transcribeBuffer(samples);
                             sendResult(result);
                         }
                     }
@@ -199,7 +197,7 @@ public class Whisper {
             });
 
             // Start the transcribe thread
-            mMicTranscribeThread.start();
+            micTranscribeThread.start();
         }
     }
 }

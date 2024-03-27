@@ -35,6 +35,14 @@ loading the history of recordings from the disk and deleting audio files if nece
 I did not introduce Hilt for dependency injection and Timber as a logger, which I usually include in
 my projects. However, I did try to handle most possible edge cases and errors.
 
+# Offline Speech Recognition (Transcription) with OpenAI Whisper and TensorFlow Lite.
+
+Credits to [vilassn](https://github.com/vilassn/whisper_android) for the project that helped me add Whisper as the Speech-to-Text engine. Now the app can transcribe text. Theoretically, Whisper understands many languages, but for now, it will only transcribe in English (English Audio -> English text and Any Language Audio -> English Text). I will try to make it work for localized transcription in the next updates.
+This project includes the Whisper's [Tiny Model of 39M parameters](https://github.com/openai/whisper/blob/main/model-card.md).
+Also, this project includes [TensorFlow-light](https://www.tensorflow.org/lite), and [FlatBuffers](https://github.com/google/flatbuffers).
+
+The original implementation of TFLiteEngine.cpp had a limitation for audio files of 30 seconds. I updated the transcribeFile function so that transcription now works for files longer than 30 seconds, although I have only tested it with 60-second files.
+
 # Screenshots
 
 Initial Screen  | A few recording added

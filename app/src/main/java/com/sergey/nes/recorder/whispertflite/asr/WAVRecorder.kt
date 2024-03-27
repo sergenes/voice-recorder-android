@@ -16,46 +16,46 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 
-class WAVRecorder(private val mContext: Context) {
-    private val mInProgress = AtomicBoolean(false)
-    private var mWavFilePath: String? = null
-    private var mExecutorThread: Thread? = null
-    private var mListener: IRecorderListener? = null
+class WAVRecorder(private val context: Context) {
+    private val inProgress = AtomicBoolean(false)
+    private var wavFilePath: String? = null
+    private var executorThread: Thread? = null
+    private var recorderListener: IRecorderListener? = null
     private var currentItem: RecordingItem? = null
     fun setListener(listener: IRecorderListener?) {
-        mListener = listener
+        recorderListener = listener
     }
 
     private fun setFilePath(wavFile: String?) {
-        mWavFilePath = wavFile
+        wavFilePath = wavFile
     }
 
     fun start() {
         currentItem = RecordingItem()
         val fileName = "${currentItem!!.id}.${Config.FILE_EXTENSION}"
         val outputFile = File(
-            mContext.getExternalFilesDir(Config.RECORDINGS_FOLDER),
+            context.getExternalFilesDir(Config.RECORDINGS_FOLDER),
             fileName
         )
         setFilePath(outputFile.absolutePath)
-        if (mInProgress.get()) {
+        if (inProgress.get()) {
             Log.d(TAG, "Recording is already in progress...")
             return
         }
-        mExecutorThread = Thread {
-            mInProgress.set(true)
+        executorThread = Thread {
+            inProgress.set(true)
             threadFunction()
-            mInProgress.set(false)
+            inProgress.set(false)
         }
-        mExecutorThread!!.start()
+        executorThread!!.start()
     }
 
     fun stop(): RecordingItem? {
-        mInProgress.set(false)
+        inProgress.set(false)
         return try {
-            if (mExecutorThread != null) {
-                mExecutorThread!!.join()
-                mExecutorThread = null
+            if (executorThread != null) {
+                executorThread!!.join()
+                executorThread = null
             }
             currentItem
         } catch (e: InterruptedException) {
@@ -67,20 +67,20 @@ class WAVRecorder(private val mContext: Context) {
     }
 
     val isInProgress: Boolean
-        get() = mInProgress.get()
+        get() = inProgress.get()
 
     private fun sendUpdate(message: String?) {
-        if (mListener != null) mListener!!.onUpdateReceived(message)
+        if (recorderListener != null) recorderListener!!.onUpdateReceived(message)
     }
 
     private fun sendData(samples: FloatArray) {
-        if (mListener != null) mListener!!.onDataReceived(samples)
+        if (recorderListener != null) recorderListener!!.onDataReceived(samples)
     }
 
     private fun threadFunction() {
         try {
             if (ActivityCompat.checkSelfPermission(
-                    mContext,
+                    context,
                     Manifest.permission.RECORD_AUDIO
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
@@ -100,13 +100,13 @@ class WAVRecorder(private val mContext: Context) {
                 AudioRecord(audioSource, sampleRateInHz, channelConfig, audioFormat, bufferSize)
             audioRecord.startRecording()
             val bufferSize1Sec = sampleRateInHz * bytesPerSample * channels
-            val bufferSize30Sec = bufferSize1Sec * 30
+            val bufferSize30Sec = bufferSize1Sec * Config.RECORDING_DURATION
             val buffer30Sec = ByteBuffer.allocateDirect(bufferSize30Sec)
             val bufferRealtime = ByteBuffer.allocateDirect(bufferSize1Sec * 5)
             var timer = 0
             var totalBytesRead = 0
             val audioData = ByteArray(bufferSize)
-            while (mInProgress.get() && totalBytesRead < bufferSize30Sec) {
+            while (inProgress.get() && totalBytesRead < bufferSize30Sec) {
                 sendUpdate(MSG_RECORDING + timer + "s")
                 val bytesRead = audioRecord.read(audioData, 0, bufferSize)
                 if (bytesRead > 0) {
@@ -150,13 +150,13 @@ class WAVRecorder(private val mContext: Context) {
 
             // Save 30 seconds of recording buffer in wav file
             WaveUtil.createWaveFile(
-                mWavFilePath,
+                wavFilePath,
                 buffer30Sec.array(),
                 sampleRateInHz,
                 channels,
                 bytesPerSample
             )
-            Log.d(TAG, "Recorded file: $mWavFilePath")
+            Log.d(TAG, "Recorded file: $wavFilePath")
             sendUpdate(MSG_RECORDING_DONE)
         } catch (e: Exception) {
             Log.e(TAG, "Error...", e)
