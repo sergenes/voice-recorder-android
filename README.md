@@ -45,9 +45,18 @@ The original implementation of TFLiteEngine.cpp had a limitation for audio files
 
 # Screenshots
 
-Initial Screen  | A few recording added
-:-------------------------:|:-------------------------:
-![Image](Screenshot_1.png) | ![Image](Screenshot_2.png)
+<table>
+  <tr>
+    <td>Initial screen</td>
+     <td>A few recording added</td>
+     <td>A transcription example</td>
+  </tr>
+  <tr>
+    <td><img src="screen1.png" width=270 height=480></td>
+    <td><img src="screen2.png" width=270 height=480></td>
+    <td><img src="screen3.png" width=270 height=480></td>
+  </tr>
+ </table>
 
 Contact
 =================================
