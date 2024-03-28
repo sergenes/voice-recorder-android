@@ -52,9 +52,9 @@ The original implementation of TFLiteEngine.cpp had a limitation for audio files
      <td>A transcription example</td>
   </tr>
   <tr>
-    <td><img src="screen1.png" width=270 height=480></td>
-    <td><img src="screen2.png" width=270 height=480></td>
-    <td><img src="screen3.png" width=270 height=480></td>
+    <td><img src="screen1.png" width=270 height=555></td>
+    <td><img src="screen2.png" width=270 height=555></td>
+    <td><img src="screen3.png" width=270 height=555></td>
   </tr>
  </table>
 
