@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
 
         val modelPath: String
         val vocabPath: String
-        val useMultilingual = false // TODO: change multilingual flag as per model used
+        val useMultilingual = true
 
         if (useMultilingual) {
             // Multilingual model and vocab
@@ -121,25 +121,36 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
         try {
             // Specify the destination directory in the app's data folder
             val destFolder = context.filesDir.absolutePath
-            for (extension in extensions) {
-                // List all files in the assets folder with the specified extension
-                val assetFiles = assetManager.list("")
-                for (assetFileName in assetFiles!!) {
-                    if (assetFileName.endsWith(".$extension")) {
-                        val outFile = File(destFolder, assetFileName)
-                        if (outFile.exists()) continue
-                        val inputStream = assetManager.open(assetFileName)
-                        val outputStream: OutputStream = FileOutputStream(outFile)
 
-                        // Copy the file from assets to the data folder
-                        val buffer = ByteArray(1024)
-                        var read: Int
-                        while (inputStream.read(buffer).also { read = it } != -1) {
-                            outputStream.write(buffer, 0, read)
+            // Check if at least one asset with any of the provided extensions exists
+            val existingFiles = File(destFolder).list()
+            val shouldCopyAssets = existingFiles?.none { fileName ->
+                extensions.any { extension ->
+                    fileName.endsWith(".$extension")
+                }
+            } ?: true
+
+            if (shouldCopyAssets) {
+                for (extension in extensions) {
+                    // List all files in the assets folder with the specified extension
+                    val assetFiles = assetManager.list("") ?: emptyArray()
+                    for (assetFileName in assetFiles) {
+                        if (assetFileName.endsWith(".$extension")) {
+                            val outFile = File(destFolder, assetFileName)
+                            if (outFile.exists()) continue
+                            val inputStream = assetManager.open(assetFileName)
+                            val outputStream: OutputStream = FileOutputStream(outFile)
+
+                            // Copy the file from assets to the data folder
+                            val buffer = ByteArray(1024)
+                            var read: Int
+                            while (inputStream.read(buffer).also { read = it } != -1) {
+                                outputStream.write(buffer, 0, read)
+                            }
+                            inputStream.close()
+                            outputStream.flush()
+                            outputStream.close()
                         }
-                        inputStream.close()
-                        outputStream.flush()
-                        outputStream.close()
                     }
                 }
             }
