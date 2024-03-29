@@ -41,8 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -50,9 +48,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sergey.nes.recorder.R
-import com.sergey.nes.recorder.app.Config
 import com.sergey.nes.recorder.app.MainActivityInterface
 import com.sergey.nes.recorder.app.Config.RECORDING_DURATION
+import com.sergey.nes.recorder.app.toDateTimeString
 import com.sergey.nes.recorder.ui.components.ItemView
 import com.sergey.nes.recorder.ui.components.RecordButton
 import com.sergey.nes.recorder.ui.components.SelectedItemView
@@ -62,7 +60,6 @@ import com.sergey.nes.recorder.ui.theme.StoryRecTheme
 import com.sergey.nes.recorder.ui.theme.normalSpace
 import com.sergey.nes.recorder.whispertflite.asr.WAVRecorder
 import kotlinx.coroutines.launch
-import java.util.Date
 
 class MainActivityForPreview : MainActivityInterface {
     override fun micPermissions(): Boolean {
@@ -76,7 +73,7 @@ class MainActivityForPreview : MainActivityInterface {
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
+fun Preview() {
     StoryRecTheme {
         HomeScreenView(
             MainActivityForPreview(),
@@ -86,6 +83,48 @@ fun GreetingPreview() {
         )
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun PreviewList() {
+    StoryRecTheme {
+        val listState = rememberLazyListState()
+        val list = listOf(RecordingItem(), RecordingItem())
+        Column {
+            LazyListForRecordings(
+                params = Params(
+                    recordings = list,
+                    listState = listState
+                )
+            ) {
+
+            }
+        }
+
+    }
+}
+
+sealed interface UiAction {
+    data class OnSelected(val value: Int) : UiAction
+    data class OnRecordingStarted(val value: Boolean) : UiAction
+    data class OnSliderValueChange(val value: Float) : UiAction
+    data object OnPlayClicked : UiAction
+    data object ActionDelete : UiAction
+    data object OnRecordingStopped : UiAction
+    data object OnTranscribe : UiAction
+    data object OnShare : UiAction
+}
+
+data class Params(
+    val recordings: List<RecordingItem>,
+    val listState: LazyListState,
+    val selectedIndex: Int = -1,
+    val micPermission: Boolean = false,
+    val isPlaying: Boolean = false,
+    val audioLength: Int = 0,
+    val audioPlayback: Float = 0f,
+    val transcribing: Boolean = false
+)
 
 @Composable
 fun HomeScreenView(
@@ -140,61 +179,74 @@ fun HomeScreenView(
 
     Box {
         HomeViewContent(
-            recordings = recordings,
-            listState = listState,
-            selectedIndex = selectedIndex,
-            micPermission = micPermission,
-            isPlaying = isPlaying.value,
-            audioLength = audioLength,
-            audioPlayback = audioPlayback,
-            onSelected = {
-                viewModel.selectRecording(it, audioPlayer)
-                viewModel.updatePlaying(false)
-            },
-            onPlayClicked = {
-                audioPlayer?.let {
-                    it.pausePlay()
-                    viewModel.updatePlaying(it.isPlaying())
-                }
-            },
-            actionDelete = {
-                viewModel.onDialogConfirm()
-            },
-            onRecordingStarted = { micPermission ->
-                if (!micPermission) {
-                    requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                } else {
-                    audioPlayer?.stop()
-                    viewModel.updatePlaying(false)
-                    audioRecorder?.start()
-                }
-            },
-            onRecordingStopped = {
-                audioRecorder?.stop()?.let {
-                    viewModel.saveInfo(it, ready = { dataSource ->
-                        if (dataSource.recordings.isNotEmpty()) {
-                            viewModel.selectRecording(0, audioPlayer)
-                            viewModel.updatePlaying(false)
-                            coroutineScope.launch {
-                                listState.animateScrollToItem(0)
-                            }
-                        }
-                    }, onError = { error ->
-                        activity.showErrorMessage(error)
-                    })
-                }
-            },
-            onSliderValueChange = {
-                audioPlayer?.updateAudioPlayback(it)
-            },
-            transcribing = transcribing,
-            onTranscribe = {
-                viewModel.transcribe {
-                    activity.showErrorMessage(it)
-                }
-            },
-            onShare = {
+            params = Params(
+                recordings = recordings,
+                listState = listState,
+                selectedIndex = selectedIndex,
+                micPermission = micPermission,
+                isPlaying = isPlaying.value,
+                audioLength = audioLength,
+                audioPlayback = audioPlayback,
+                transcribing = transcribing,
+            ),
+            onUiAction = { action ->
+                when (action) {
+                    is UiAction.OnShare -> {
 
+                    }
+
+                    UiAction.ActionDelete -> {
+                        viewModel.onDialogConfirm()
+                    }
+
+                    UiAction.OnPlayClicked -> {
+                        audioPlayer?.let {
+                            it.pausePlay()
+                            viewModel.updatePlaying(it.isPlaying())
+                        }
+                    }
+
+                    is UiAction.OnRecordingStarted -> {
+                        if (!action.value) {
+                            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            audioPlayer?.stop()
+                            viewModel.updatePlaying(false)
+                            audioRecorder?.start()
+                        }
+                    }
+
+                    UiAction.OnRecordingStopped -> {
+                        audioRecorder?.stop()?.let {
+                            viewModel.saveInfo(it, ready = { dataSource ->
+                                if (dataSource.recordings.isNotEmpty()) {
+                                    viewModel.selectRecording(0, audioPlayer)
+                                    viewModel.updatePlaying(false)
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem(0)
+                                    }
+                                }
+                            }, onError = { error ->
+                                activity.showErrorMessage(error)
+                            })
+                        }
+                    }
+
+                    is UiAction.OnSelected -> {
+                        viewModel.selectRecording(action.value, audioPlayer)
+                        viewModel.updatePlaying(false)
+                    }
+
+                    is UiAction.OnSliderValueChange -> {
+                        audioPlayer?.updateAudioPlayback(action.value)
+                    }
+
+                    UiAction.OnTranscribe -> {
+                        viewModel.transcribe {
+                            activity.showErrorMessage(it)
+                        }
+                    }
+                }
             }
         )
         if (showDialog) {
@@ -231,26 +283,11 @@ fun HomeScreenView(
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeViewContent(
-    recordings: List<RecordingItem>,
-    listState: LazyListState,
-    selectedIndex: Int,
-    micPermission: Boolean,
-    isPlaying: Boolean,
-    audioLength: Int = 0,
-    audioPlayback: Float = 0f,
-    onSelected: (Int) -> Unit,
-    onPlayClicked: () -> Unit,
-    actionDelete: () -> Unit,
-    onRecordingStarted: (Boolean) -> Unit,
-    onRecordingStopped: () -> Unit,
-    onSliderValueChange: (Float) -> Unit = {},
-    transcribing: Boolean = false,
-    onTranscribe: () -> Unit = {},
-    onShare: () -> Unit = {}
+    params: Params,
+    onUiAction: (UiAction) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -266,82 +303,98 @@ fun HomeViewContent(
         },
         content = { innerPadding ->
             Column(modifier = Modifier.padding(innerPadding)) {
-                if (!micPermission) {
+                if (!params.micPermission) {
                     MicPermissionMessage()
                 }
-                if (recordings.isEmpty()) {
+                if (params.recordings.isEmpty()) {
                     EmptyListMessage()
                 } else {
-                    var query by remember { mutableStateOf(TextFieldValue("")) }
-                    val filteredItems =
-                        recordings.filter { it.transcription.contains(query.text, ignoreCase = true) }
-                    TextField(
-                        value = query,
-                        textStyle = TextStyle(
-                            fontSize = 17.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(),
-                        singleLine = true,
-                        onValueChange = { newQuery -> query = newQuery },
-                        label = { Text("Search") },
-                        modifier = Modifier.semantics {
-                            this.contentDescription = "Search through the conversation history." }
-                            .fillMaxWidth(0.9f)
-                            .background(
-                                MaterialTheme.colorScheme.background,
-                                RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = normalSpace)
-                    )
-                    Spacer(modifier = Modifier.height(normalSpace))
-                    LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
-                        items(filteredItems.size) { index ->
-                            val item = filteredItems[index]
-                            val title = Config.DATE_TIME_FORMAT.format(
-                                Date(item.dateTime)
-                            )
-                            val transcription = item.transcription
-                            if (selectedIndex == index) {
-                                SelectedItemView(
-                                    title = title,
-                                    transcription = transcription,
-                                    speaking = isPlaying,
-                                    audioLength = audioLength,
-                                    audioPlayback = audioPlayback,
-                                    actionPlay = onPlayClicked,
-                                    actionDelete = actionDelete,
-                                    onSliderValueChange = onSliderValueChange,
-                                    transcribing = transcribing,
-                                    onTranscribe = onTranscribe,
-                                    onShare = onShare
-                                )
-                            } else {
-                                ItemView(title = title, transcription = transcription, onSelect = {
-                                    onSelected(index)
-                                })
-                            }
-                        }
-                    }
+                    LazyListForRecordings(params, onUiAction)
                 }
             }
         },
-        bottomBar = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.LightGray)
-                    .padding(normalSpace)
-            ) {
-                RecordButton(
-                    maxDuration = RECORDING_DURATION,
-                    micPermission = micPermission,
-                    onRecordingStarted = onRecordingStarted,
-                    onRecordingStopped = onRecordingStopped
+        bottomBar = { BottomBar(params, onUiAction) })
+}
+
+@Composable
+fun LazyListForRecordings(params: Params, onUiAction: (UiAction) -> Unit) {
+    var query by remember { mutableStateOf(TextFieldValue("")) }
+    val filteredItems =
+        params.recordings.filter {
+            it.transcription.contains(
+                query.text,
+                ignoreCase = true
+            )
+        }
+    TextField(
+        value = query,
+        textStyle = TextStyle(
+            fontSize = 17.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        ),
+        colors = OutlinedTextFieldDefaults.colors(),
+        singleLine = true,
+        onValueChange = { newQuery -> query = newQuery },
+        label = { Text(stringResource(R.string.search)) },
+        modifier = Modifier
+            .fillMaxWidth(0.9f)
+            .background(
+                MaterialTheme.colorScheme.background,
+                RoundedCornerShape(4.dp)
+            )
+            .padding(horizontal = normalSpace)
+    )
+    Spacer(modifier = Modifier.height(normalSpace))
+    LazyColumn(state = params.listState, modifier = Modifier.fillMaxHeight()) {
+        items(filteredItems.size) { index ->
+            val item = filteredItems[index]
+            val title = item.dateTime.toDateTimeString()
+            val transcription = item.transcription
+            if (params.selectedIndex == index) {
+                SelectedItemView(
+                    title = title,
+                    transcription = transcription,
+                    speaking = params.isPlaying,
+                    audioLength = params.audioLength,
+                    audioPlayback = params.audioPlayback,
+                    actionPlay = { onUiAction(UiAction.OnPlayClicked) },
+                    actionDelete = { onUiAction(UiAction.ActionDelete) },
+                    onSliderValueChange = {
+                        onUiAction(
+                            UiAction.OnSliderValueChange(
+                                it
+                            )
+                        )
+                    },
+                    transcribing = params.transcribing,
+                    onTranscribe = { onUiAction(UiAction.OnTranscribe) },
+                    onShare = { onUiAction(UiAction.OnShare) }
                 )
+            } else {
+                ItemView(title = title, transcription = transcription, onSelect = {
+                    onUiAction(UiAction.OnSelected(index))
+                })
             }
-        })
+        }
+    }
+}
+
+@Composable
+fun BottomBar(params: Params, onUiAction: (UiAction) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.LightGray)
+            .padding(normalSpace)
+    ) {
+        RecordButton(
+            maxDuration = RECORDING_DURATION,
+            micPermission = params.micPermission,
+            onRecordingStarted = { onUiAction(UiAction.OnRecordingStarted(it)) },
+            onRecordingStopped = { onUiAction(UiAction.OnRecordingStopped) }
+        )
+    }
 }
 
 @Composable

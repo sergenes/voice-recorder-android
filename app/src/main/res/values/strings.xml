@@ -6,4 +6,5 @@
     <string name="please_confirm_deleting">Please confirm deleting</string>
     <string name="are_you_sure_you_can_not_undo_this_action">Are you sure?\nYou can not undo this action!</string>
     <string name="yes">Yes</string>
+    <string name="search">Search</string>
 </resources>
