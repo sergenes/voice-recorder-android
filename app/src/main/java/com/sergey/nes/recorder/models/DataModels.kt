@@ -1,8 +1,12 @@
 package com.sergey.nes.recorder.models
 
+import kotlinx.serialization.Serializable
 import java.util.UUID
 
+@Serializable
 data class RecordingItem(
-    val id: UUID = UUID.randomUUID(),
-    val dateTime: Long = -1
+    val id: String = UUID.randomUUID().toString(),
+    val dateTime: Long = System.currentTimeMillis(),
+    val transcription: String = "",
+    val duration: Long = -1
 )

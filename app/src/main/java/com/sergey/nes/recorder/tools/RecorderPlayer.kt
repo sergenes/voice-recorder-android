@@ -115,6 +115,7 @@ class AudioPlayer(
     }
 }
 
+@Deprecated("I had to use WAVRecorder, as I wasn't able to record in PCM WAV format.")
 class AudioRecorder(private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var currentItem: RecordingItem? = null

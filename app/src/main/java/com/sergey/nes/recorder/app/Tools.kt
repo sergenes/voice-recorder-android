@@ -6,6 +6,17 @@ import java.util.Date
 import java.util.TimeZone
 
 @SuppressLint("SimpleDateFormat")
+fun Long?.toDateTimeString(): String {
+    this?.let {
+       return SimpleDateFormat("M/dd/yyyy hh:mm a").format(
+            Date(this)
+        )
+    }?: run {
+        return "Unknown"
+    }
+}
+
+@SuppressLint("SimpleDateFormat")
 fun Float?.formatSecondsToHMS(): String {
     this?.let {
         val seconds = it * 1000L

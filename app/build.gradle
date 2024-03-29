@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
+    alias(libs.plugins.serialization)
 }
 
 android {
@@ -9,14 +10,18 @@ android {
 
     defaultConfig {
         applicationId "com.sergey.nes.recorder"
-        minSdk 24
+        minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
+        }
+        // Specify the ABIs to exclude
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
         }
     }
 
@@ -35,6 +40,11 @@ android {
     }
     buildFeatures {
         compose true
+    }
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+        }
     }
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.1'
@@ -65,4 +75,8 @@ dependencies {
     debugImplementation libs.androidx.ui.test.manifest
     //
     implementation libs.androidx.material.icons.extended
+    implementation(libs.kotlinx.serialization.json)
+    //
+    implementation 'org.tensorflow:tensorflow-lite:2.11.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:0.4.3'
 }
