@@ -192,7 +192,7 @@ fun HomeScreenView(
             onUiAction = { action ->
                 when (action) {
                     is UiAction.OnShare -> {
-
+                        //viewModel.deleteTranscriptForTest()
                     }
 
                     UiAction.ActionDelete -> {

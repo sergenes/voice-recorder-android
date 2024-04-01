@@ -64,7 +64,7 @@ class HomeVewModel(
                         result.fold(
                             onSuccess = {
                                 onLoad(ready = {
-                                    _dataSource.value = _dataSource.value.copy()
+                                    _dataSource.value = _dataSource.value.copy(selectedIndex = index)
                                 }, onError = {
 
                                 })

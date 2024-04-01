@@ -182,29 +182,29 @@ fun SelectedItemView(
                 ) {
                     if (transcription.isEmpty()) {
                         Box(contentAlignment = Alignment.Center) {
-                            IconButton(
-                                enabled = !transcribing,
-                                onClick = onTranscribe
-                            ) {
-                                Icon(
-                                    Icons.Filled.Receipt,
-                                    contentDescription = "delete",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
                             if (transcribing) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(32.dp),
                                     color = MaterialTheme.colorScheme.primary,
                                     strokeWidth = 6.dp
                                 )
+                            } else {
+                                IconButton(
+                                    onClick = onTranscribe
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Receipt,
+                                        contentDescription = "transcribe",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }
                     IconButton(onClick = onShare) {
                         Icon(
                             Icons.Filled.Share,
-                            contentDescription = "delete",
+                            contentDescription = "share",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
