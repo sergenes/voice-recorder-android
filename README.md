@@ -1,63 +1,98 @@
-# voice-recorder-android
+# Android Voice Recorder Demo App (Kotlin, Jetpack Compose, MVVM, JNI, OpenAI Whisper, and TensorFlow Lite)
 
-A dictaphone app where users can record and log short voice messages. The app keeps history of the
-recordings so users can play them later.
+This is a dictaphone app where users can record and log short voice messages. The app maintains a history of recordings, allowing users to play them later. Users can transcribe selected recordings, search through recordings by transcribed text, delete recordings, and share selected items. When a user plays a recording, subsequent recordings automatically play in descending order.
 
-# Brief Project Description (Android, Kotlin, Jetpack Compose App, MVVM)
+## Brief Project Description
 
-I created this project using the default Android Studio New App template (Empty Activity),
-implementing it as a Kotlin Jetpack Compose project.
+This project was created using the default Android Studio New App template (Empty Activity) and implemented as a Kotlin Jetpack Compose project.
 
-Android Studio Iguana | 2023.2.1 Patch 1 | gradle-8.4
+### Environment
+- Android Studio Iguana | 2023.2.1 Patch 1
+- Gradle Version: 8.4
 
-In the build.gradle file, the only change made was to add a dependency to an extended icons library
-to include Mic and Stop icons for the Record/Stop Button.
+### Changes Made
+- Added dependency to an extended icons library for Mic and Stop icons for the Record/Stop Button.
+- Added user permissions for recording audio and wake lock to keep the screen on while playing audio.
+- Declared the microphone feature as required for compatibility with devices equipped with a microphone.
 
-In the Manifest, I added user permissions for recording audio and wake lock to keep the screen on
-while playing audio. Additionally, I declared the microphone feature as required to ensure app
-compatibility with devices equipped with a microphone.
+### Components
+1. **Record/Stop Button**: Includes a circle gauge indicating the remaining time until the end of recording (capped at 1 minute).
+   - [RecordButton](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/components/RecordButton.kt)
+2. **List Item View Components**:
+   - Regular item (ItemView): Displays only the recording time.
+   - Selected item (SelectedItemView): Allows users to play audio, control feedback, and delete the recording.
+   - [ItemViews](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/components/ItemViews.kt)
 
-I used standard default colors throughout the project.
+### Architecture
+- MVVM pattern:
+  - View: [HomeScreen](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeScreen.kt)
+  - Data Model: [RecordingItem](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/models/DataModels.kt)
+  - ViewModel: [HomeViewModel](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeViewModel.kt)
+  - Repository: [HomeRepository](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeRepository.kt)
 
-I reused components from previous projects, making minor updates:
+## TODO:
+- Integrate Hilt for dependency injection.
+- Add MVI implementation for comparison.
+- Implement Timber as a logger.
+- Add functionality to share audio files and transcriptions.
+- Implement navigation and a Settings screen.
+- Add UI/Unit tests.
+- Experiment with different models to make the transcriber work for languages other than English and generate timecodes for transcribed words to highlight them synchronously with audio playback.
 
-1. The Record/Stop button [RecordButton](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/components/RecordButton.kt), which includes a circle gauge indicating the time
-   remaining until the end of recording (capped at 1 minute - can be updated in [Config](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/app/Config.kt)).
+## Offline Speech Recognition (Transcription) with OpenAI Whisper and TensorFlow Lite
 
-2. To avoid making the screen too busy, I introduced two list item view components. The regular
-   item (ItemView) displays only the time of recording, while the selected item allows users to play
-   the audio, control feedback, and delete the recording [SelectedItemView](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/components/ItemViews.kt).
+This project includes OpenAI Whisper for speech-to-text conversion. Whisper currently transcribes only English audio. The project includes the Whisper Tiny Model (39M parameters), TensorFlow Lite, and FlatBuffers.
 
-I implemented a variation of the MVVM pattern, where [HomeScreen](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeScreen.kt) serves as the view, [RecordingItem](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/models/DataModels.kt) as
-the data model, [HomeViewModel](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeViewModel.kt) manages most of the UI state and references the [HomeRepository](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeRepository.kt) for
-loading the history of recordings from the disk and deleting audio files if necessary.
+I updated the `transcribeFile` function in `TFLiteEngine.cpp` to support audio files longer than 30 seconds, although testing has been limited to 60-second files.
 
-I did not introduce Hilt for dependency injection and Timber as a logger, which I usually include in
-my projects. However, I did try to handle most possible edge cases and errors.
+**Before My Fix:**
+```java
+std::string TFLiteEngine::transcribeFile(const char *waveFile) {
+    std::vector<float> pcmf32 = readWAVFile(waveFile);
+    pcmf32.resize((WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE), 0);
+    std::string text = transcribeBuffer(pcmf32);
+    return text;
+}
+```
 
-# Offline Speech Recognition (Transcription) with OpenAI Whisper and TensorFlow Lite.
+**After My Fix:**
+```java
+std::string TFLiteEngine::transcribeFile(const char *waveFile) {
+    // make transcription work for files longer than 30 seconds
+    std::vector<float> pcmf32 = readWAVFile(waveFile);
+    size_t originalSize = pcmf32.size();
 
-Credits to [vilassn](https://github.com/vilassn/whisper_android) for the project that helped me add Whisper as the Speech-to-Text engine. Now the app can transcribe text. Theoretically, Whisper understands many languages, but for now, it will only transcribe in English (English Audio -> English text and Any Language Audio -> English Text). I will try to make it work for localized transcription in the next updates.
-This project includes the Whisper's [Tiny Model of 39M parameters](https://github.com/openai/whisper/blob/main/model-card.md).
-Also, this project includes [TensorFlow-light](https://www.tensorflow.org/lite), and [FlatBuffers](https://github.com/google/flatbuffers).
+    // Determine the number of chunks required to process the entire file
+    size_t totalChunks = (originalSize + (WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE) - 1) /
+                         (WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE);
 
-The original implementation of TFLiteEngine.cpp had a limitation for audio files of 30 seconds. I updated the transcribeFile function so that transcription now works for files longer than 30 seconds, although I have only tested it with 60-second files.
+    std::string text;
+    for (size_t chunkIndex = 0; chunkIndex < totalChunks; ++chunkIndex) {
+        // Extract a chunk of audio data
+        size_t startSample = chunkIndex * WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE;
+        size_t endSample = std::min(startSample + (WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE),
+                                    originalSize);
+        std::vector<float> chunk(pcmf32.begin() + startSample, pcmf32.begin() + endSample);
 
-# Screenshots
+        // Pad the chunk if it's smaller than the expected size
+        if (chunk.size() < WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE) {
+            chunk.resize(WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE, 0);
+        }
 
-<table>
-  <tr>
-    <td>Initial screen</td>
-     <td>A few recording added</td>
-     <td>A transcription example</td>
-  </tr>
-  <tr>
-    <td><img src="screen1.png" width=270 height=555></td>
-    <td><img src="screen2.png" width=270 height=555></td>
-    <td><img src="screen3.png" width=270 height=555></td>
-  </tr>
- </table>
+        // Transcribe the chunk and append the result to the text
+        std::string chunkText = transcribeBuffer(chunk);
+        text += chunkText;
+    }
+    return text;
+}
+```
 
-Contact
-=================================
-Contact and follow me on LinkedIn: https://www.linkedin.com/in/sergey-neskoromny-86662a10/
+## Screenshots
+
+| Initial Screen          | Recordings Added        | Transcription Example   |
+|-------------------------|-------------------------|-------------------------|
+| ![Initial Screen](screen1.png) | ![Recordings Added](screen2.png) | ![Transcription Example](screen3.png) |
+
+## Contact
+
+Connect and follow me on LinkedIn: [Sergey N](https://www.linkedin.com/in/sergey-neskoromny-86662a10/)
