@@ -63,50 +63,6 @@ includes the Whisper Tiny Model (39M parameters), TensorFlow Lite, and FlatBuffe
 I updated the `transcribeFile` function in `TFLiteEngine.cpp` to support audio files longer than 30
 seconds, although testing has been limited to 60-second files.
 
-**Before Fix:**
-
-```java
-std::string TFLiteEngine::transcribeFile(const char*waveFile){
-    std::vector<float>pcmf32=readWAVFile(waveFile);
-    pcmf32.resize((WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE),0);
-    std::string text=transcribeBuffer(pcmf32);
-    return text;
-}
-```
-
-**After Fix:**
-
-```java
-std::string TFLiteEngine::transcribeFile(const char*waveFile){
-   // make transcription work for files longer than 30 seconds
-   std::vector<float>pcmf32=readWAVFile(waveFile);
-   size_t originalSize=pcmf32.size();
-
-   // Determine the number of chunks required to process the entire file
-   size_t totalChunks=(originalSize+(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE)-1)/
-   (WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE);
-
-   std::string text;
-   for(size_t chunkIndex=0;chunkIndex<totalChunks; ++chunkIndex){
-   // Extract a chunk of audio data
-   size_t startSample=chunkIndex*WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE;
-   size_t endSample=std::min(startSample+(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE),
-   originalSize);
-   std::vector<float>chunk(pcmf32.begin()+startSample,pcmf32.begin()+endSample);
-
-   // Pad the chunk if it's smaller than the expected size
-   if(chunk.size()<WHISPER_SAMPLE_RATE *WHISPER_CHUNK_SIZE){
-   chunk.resize(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE,0);
-   }
-
-   // Transcribe the chunk and append the result to the text
-   std::string chunkText=transcribeBuffer(chunk);
-   text+=chunkText;
-   }
-   return text;
-}
-```
-
 ## How to generate TFLite model from Whisper
 The original Whisper models are in PyTorch format and needs to be converted into TensorFlow Lite format.
 [Google Colab](https://colab.research.google.com/github/usefulsensors/openai-whisper/blob/main/notebooks/generate_tflite_from_whisper.ipynb)
@@ -125,6 +81,10 @@ The original Whisper models are in PyTorch format and needs to be converted into
     <td><img src="screen3.png" width=270 height=555></td>
   </tr>
  </table>
+
+## Download
+"Note that this APK contains several models, so it is heavy, around 142 MB. Also, make sure your Android device allows installation of APKs from sources other than Google Play.
+[Story Rec Demo App](https://answersolutions.net/voice-rec-release.apk)
 
 ## Contact
 
