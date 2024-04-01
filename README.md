@@ -107,6 +107,10 @@ std::string TFLiteEngine::transcribeFile(const char*waveFile){
 }
 ```
 
+## How to generate TFLite model from Whisper
+
+(Google Colab)[https://colab.research.google.com/github/usefulsensors/openai-whisper/blob/main/notebooks/generate_tflite_from_whisper.ipynb]
+
 ## Screenshots
 
 <table>
