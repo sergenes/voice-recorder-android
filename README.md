@@ -67,53 +67,61 @@ seconds, although testing has been limited to 60-second files.
 
 ```java
 std::string TFLiteEngine::transcribeFile(const char*waveFile){
-        std::vector<float>pcmf32=readWAVFile(waveFile);
-        pcmf32.resize((WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE),0);
-        std::string text=transcribeBuffer(pcmf32);
-        return text;
-        }
+    std::vector<float>pcmf32=readWAVFile(waveFile);
+    pcmf32.resize((WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE),0);
+    std::string text=transcribeBuffer(pcmf32);
+    return text;
+}
 ```
 
 **After Fix:**
 
 ```java
 std::string TFLiteEngine::transcribeFile(const char*waveFile){
-        // make transcription work for files longer than 30 seconds
-        std::vector<float>pcmf32=readWAVFile(waveFile);
-        size_t originalSize=pcmf32.size();
+   // make transcription work for files longer than 30 seconds
+   std::vector<float>pcmf32=readWAVFile(waveFile);
+   size_t originalSize=pcmf32.size();
 
-        // Determine the number of chunks required to process the entire file
-        size_t totalChunks=(originalSize+(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE)-1)/
-        (WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE);
+   // Determine the number of chunks required to process the entire file
+   size_t totalChunks=(originalSize+(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE)-1)/
+   (WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE);
 
-        std::string text;
-        for(size_t chunkIndex=0;chunkIndex<totalChunks; ++chunkIndex){
-        // Extract a chunk of audio data
-        size_t startSample=chunkIndex*WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE;
-        size_t endSample=std::min(startSample+(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE),
-        originalSize);
-        std::vector<float>chunk(pcmf32.begin()+startSample,pcmf32.begin()+endSample);
+   std::string text;
+   for(size_t chunkIndex=0;chunkIndex<totalChunks; ++chunkIndex){
+   // Extract a chunk of audio data
+   size_t startSample=chunkIndex*WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE;
+   size_t endSample=std::min(startSample+(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE),
+   originalSize);
+   std::vector<float>chunk(pcmf32.begin()+startSample,pcmf32.begin()+endSample);
 
-        // Pad the chunk if it's smaller than the expected size
-        if(chunk.size()<WHISPER_SAMPLE_RATE *WHISPER_CHUNK_SIZE){
-        chunk.resize(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE,0);
-        }
+   // Pad the chunk if it's smaller than the expected size
+   if(chunk.size()<WHISPER_SAMPLE_RATE *WHISPER_CHUNK_SIZE){
+   chunk.resize(WHISPER_SAMPLE_RATE*WHISPER_CHUNK_SIZE,0);
+   }
 
-        // Transcribe the chunk and append the result to the text
-        std::string chunkText=transcribeBuffer(chunk);
-        text+=chunkText;
-        }
-        return text;
-        }
+   // Transcribe the chunk and append the result to the text
+   std::string chunkText=transcribeBuffer(chunk);
+   text+=chunkText;
+   }
+   return text;
+}
 ```
 
 ## Screenshots
 
-| Initial Screen                 | Recordings Added                 | Transcription Example                 |
-|--------------------------------|----------------------------------|---------------------------------------|
-| ![Initial Screen](screen1.png) | ![Recordings Added](screen2.png) | ![Transcription Example](screen3.png) |
+<table>
+  <tr>
+    <td>Initial screen</td>
+     <td>A few recording added</td>
+     <td>A transcription example</td>
+  </tr>
+  <tr>
+    <td><img src="screen1.png" width=270 height=555></td>
+    <td><img src="screen2.png" width=270 height=555></td>
+    <td><img src="screen3.png" width=270 height=555></td>
+  </tr>
+ </table>
 
 ## Contact
 
-Connect and follow me on
-LinkedIn: [Sergey N](https://www.linkedin.com/in/sergey-neskoromny-86662a10/)
+Connect and follow me on LinkedIn: [Sergey N](https://www.linkedin.com/in/sergey-neskoromny-86662a10/)
