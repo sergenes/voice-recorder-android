@@ -83,7 +83,7 @@ The original Whisper models are in PyTorch format and needs to be converted into
  </table>
 
 ## Download
-Note that this APK contains several models, so it is heavy, around 142 MB. Also, make sure your Android device allows installation of APKs from sources other than Google Play.
+Note that this APK contains whisper-tiny.tflite model, so it is heavy, around 100 MB. Also, make sure your Android device allows installation of APKs from sources other than Google Play.
 [Story Rec Demo App](https://answersolutions.net/voice-rec-release.apk)
 
 ## Contact
