@@ -88,4 +88,4 @@ Note that this APK contains whisper-tiny.tflite model, so it is heavy, around 10
 
 ## Contact
 
-Connect and follow me on LinkedIn: [Sergey N](https://www.linkedin.com/in/sergey-neskoromny-86662a10/)
+Connect and follow me on LinkedIn: [Sergey N](https://www.linkedin.com/in/sergey-neskoromny/)
