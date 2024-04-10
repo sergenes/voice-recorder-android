@@ -101,6 +101,7 @@ class WAVRecorder(private val context: Context) {
             audioRecord.startRecording()
             val bufferSize1Sec = sampleRateInHz * bytesPerSample * channels
             val bufferSize30Sec = bufferSize1Sec * Config.RECORDING_DURATION
+
             val buffer30Sec = ByteBuffer.allocateDirect(bufferSize30Sec)
             val bufferRealtime = ByteBuffer.allocateDirect(bufferSize1Sec * 5)
             var timer = 0
@@ -151,7 +152,7 @@ class WAVRecorder(private val context: Context) {
             // Save 30 seconds of recording buffer in wav file
             WaveUtil.createWaveFile(
                 wavFilePath,
-                buffer30Sec.array(),
+                buffer30Sec.array().sliceArray(0 until totalBytesRead),
                 sampleRateInHz,
                 channels,
                 bytesPerSample
