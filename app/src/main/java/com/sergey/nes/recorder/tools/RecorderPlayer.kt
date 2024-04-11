@@ -22,6 +22,10 @@ import kotlinx.coroutines.isActive
 import java.io.File
 import java.io.FileOutputStream
 
+fun State<Int>?.zeroIfNull(): Int = this?.value ?: 0
+
+fun State<Float>?.zeroIfNull(): Float = this?.value ?: 0f
+
 class AudioPlayer(
     private val context: Context,
 ) {

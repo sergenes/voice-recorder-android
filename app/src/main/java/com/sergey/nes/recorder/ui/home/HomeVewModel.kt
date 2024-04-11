@@ -71,12 +71,13 @@ class HomeVewModel(
         data object Error : UiState()
     }
 
-    fun onLoad(index: Int) = viewModelScope.launch {
+    fun onLoad(index2Select: Int) = viewModelScope.launch {
         _uiState.value = UiState.Loading()
         repository.getRecordings().collect { result ->
             result.fold(
                 onSuccess = { recordings ->
-                    val selectedIndex = if (index in 0..recordings.lastIndex) index else -1
+                    val selectedIndex =
+                        if (index2Select in 0..recordings.lastIndex) index2Select else -1
                     _uiState.value = UiState.Content(
                         recordings = recordings,
                         selectedIndex = selectedIndex,
@@ -104,12 +105,12 @@ class HomeVewModel(
     }
 
 
-    private fun resolveCurrentItem(valid: (RecordingItem, Int, UiState.Content) -> Unit) =
+    private fun resolveCurrentItem(resolved: (RecordingItem, Int, UiState.Content) -> Unit) =
         uiState.contentState()?.let {
             val index = it.selectedIndex
             if (index in 0..it.recordings.lastIndex) {
                 val item = it.recordings[index]
-                valid(item, index, it)
+                resolved(item, index, it)
             }
         }
 
@@ -117,7 +118,7 @@ class HomeVewModel(
     fun transcribe() = resolveCurrentItem { item, _, state ->
         if (item.transcription.isEmpty()) {
             if (whisper?.isInProgress == true) {
-                onError("In the process")
+                onSoftError("In the process")
             } else {
                 whisper?.setFilePath(item)
                 whisper?.setAction(Whisper.ACTION_TRANSCRIBE)
@@ -125,7 +126,7 @@ class HomeVewModel(
                 _uiState.value = state.copy(isTranscribing = true)
             }
         } else {
-            onError("Already transcribed")
+            onSoftError("Already transcribed")
         }
     }
 
@@ -142,9 +143,9 @@ class HomeVewModel(
                             },
                             onFailure = { throwable ->
                                 throwable.localizedMessage?.let { message ->
-                                    onError(message)
+                                    onSoftError(message)
                                 } ?: run {
-                                    onError("Unknown Error")
+                                    onSoftError("Unknown Error")
                                 }
                             }
                         )
@@ -179,9 +180,9 @@ class HomeVewModel(
                     },
                     onFailure = { throwable ->
                         throwable.localizedMessage?.let { message ->
-                            onError(message)
+                            onSoftError(message)
                         } ?: run {
-                            onError("Unknown Error")
+                            onSoftError("Unknown Error")
                         }
                     }
                 )
@@ -199,7 +200,7 @@ class HomeVewModel(
             }
         }
 
-    private fun onError(value: String) = uiState.contentState()?.let { state ->
+    private fun onSoftError(value: String) = uiState.contentState()?.let { state ->
         _uiState.value = state.copy(error = value, transcribing = false, isPlaying = false)
     }
 
