@@ -37,11 +37,8 @@ class HomeVewModel(
     private val _uiState = MutableStateFlow<UiState>(UiState.Initial)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private fun StateFlow<UiState>.resolveContentState(): UiState.Content? {
-        (this.value as? UiState.Content)?.let {
-            return it
-        } ?: run { return null }
-    }
+    private fun StateFlow<UiState>.resolveContentState(): UiState.Content? =
+        (this.value as? UiState.Content) ?: run { null }
 
     sealed class UiState {
         data object Initial : UiState()
