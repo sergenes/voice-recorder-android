@@ -37,8 +37,8 @@ class HomeVewModel(
     private val _uiState = MutableStateFlow<UiState>(UiState.Initial)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private fun StateFlow<UiState>.resolveContentState(): UiState.Content? =
-        (this.value as? UiState.Content) ?: run { null }
+    private fun StateFlow<UiState>.contentState(): UiState.Content? =
+        this.value as? UiState.Content
 
     sealed class UiState {
         data object Initial : UiState()
@@ -94,7 +94,7 @@ class HomeVewModel(
     }
 
 
-    fun currentItem(): RecordingItem? = uiState.resolveContentState()?.let {
+    fun currentItem(): RecordingItem? = uiState.contentState()?.let {
         val index = it.selectedIndex
         if (index in 0..it.recordings.lastIndex) {
             return it.recordings[index]
@@ -105,7 +105,7 @@ class HomeVewModel(
 
 
     private fun resolveCurrentItem(valid: (RecordingItem, Int, UiState.Content) -> Unit) =
-        uiState.resolveContentState()?.let {
+        uiState.contentState()?.let {
             val index = it.selectedIndex
             if (index in 0..it.recordings.lastIndex) {
                 val item = it.recordings[index]
@@ -161,7 +161,7 @@ class HomeVewModel(
                 },
                 onFailure = { throwable ->
                     val message = throwable.localizedMessage ?: "Unknown Error"
-                    uiState.resolveContentState()?.let {
+                    uiState.contentState()?.let {
                         _uiState.value = it.copy(error = message)
                     }
                 }
@@ -191,7 +191,7 @@ class HomeVewModel(
 
 
     fun selectRecording(index: Int, audioPlayer: AudioPlayer?) =
-        uiState.resolveContentState()?.let {
+        uiState.contentState()?.let {
             _uiState.value = it.copy(selectedIndex = index)
             if (index in 0..it.recordings.lastIndex) {
                 val item = it.recordings[index]
@@ -199,7 +199,7 @@ class HomeVewModel(
             }
         }
 
-    private fun onError(value: String) = uiState.resolveContentState()?.let { state ->
+    private fun onError(value: String) = uiState.contentState()?.let { state ->
         _uiState.value = state.copy(error = value, transcribing = false, isPlaying = false)
     }
 
@@ -207,7 +207,7 @@ class HomeVewModel(
     fun onPlayCompleted(audioPlayer: AudioPlayer?) {
         audioPlayer?.stop()
         updatePlaying(false)
-        uiState.resolveContentState()?.let {
+        uiState.contentState()?.let {
             val nextIndex = it.selectedIndex + 1
             if (it.recordings.lastIndex >= nextIndex) {
                 // play next in list
@@ -221,35 +221,35 @@ class HomeVewModel(
     }
 
     fun selectedIndex(): Int? {
-        return uiState.resolveContentState()?.selectedIndex
+        return uiState.contentState()?.selectedIndex
     }
 
     fun isNextAvailable(): Boolean {
-        uiState.resolveContentState()?.let {
+        uiState.contentState()?.let {
             return it.isPlaying && it.selectedIndex in 0..it.recordings.lastIndex
         } ?: run {
             return false
         }
     }
 
-    fun updatePlaying(value: Boolean) = uiState.resolveContentState()?.let {
+    fun updatePlaying(value: Boolean) = uiState.contentState()?.let {
         _uiState.value = it.copy(isPlaying = value)
     }
 
 
-    fun onDialogConfirm() = uiState.resolveContentState()?.let {
+    fun onDialogConfirm() = uiState.contentState()?.let {
         _uiState.value = it.copy(showDialog = true)
     }
 
-    fun onDialogDismiss() = uiState.resolveContentState()?.let {
+    fun onDialogDismiss() = uiState.contentState()?.let {
         _uiState.value = it.copy(showDialog = false)
     }
 
-    fun onErrorDialogDismiss() = uiState.resolveContentState()?.let {
+    fun onErrorDialogDismiss() = uiState.contentState()?.let {
         _uiState.value = it.copy(error = "")
     }
 
-    fun deleteTranscriptForTest() = uiState.resolveContentState()?.let {
+    fun deleteTranscriptForTest() = uiState.contentState()?.let {
         val index = it.selectedIndex
         val recording = it.recordings[index]
         saveTranscription("", audioFileId = recording.id)
