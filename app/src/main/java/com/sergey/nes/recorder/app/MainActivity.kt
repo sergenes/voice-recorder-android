@@ -18,7 +18,6 @@ import com.sergey.nes.recorder.ui.home.HomeRepository
 import com.sergey.nes.recorder.ui.home.HomeScreenView
 import com.sergey.nes.recorder.ui.home.HomeVewModel
 import com.sergey.nes.recorder.ui.theme.StoryRecTheme
-import com.sergey.nes.recorder.whispertflite.asr.IWhisperListener
 import com.sergey.nes.recorder.whispertflite.asr.WAVRecorder
 import com.sergey.nes.recorder.whispertflite.asr.Whisper
 import java.io.File
@@ -28,7 +27,6 @@ import java.io.OutputStream
 
 interface MainActivityInterface {
     fun micPermissions(): Boolean
-    fun showErrorMessage(message: String)
 }
 
 class MainActivity : ComponentActivity(), MainActivityInterface {
@@ -45,7 +43,7 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
         return permissionStatus == PackageManager.PERMISSION_GRANTED
     }
 
-    override fun showErrorMessage(message: String) {
+    fun showErrorMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
@@ -59,7 +57,6 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-
                     HomeScreenView(
                         activity = this,
                         viewModel = homeVewModel,
@@ -88,22 +85,6 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
         }
 
         whisper.loadModel(modelPath, vocabPath, useMultilingual)
-        whisper.setListener(object : IWhisperListener {
-            override fun onUpdateReceived(message: String) {
-                Log.d("MainActivity", "Update is received, Message: $message")
-//                if (message == Whisper.MSG_PROCESSING) {
-//                } else if (message == Whisper.MSG_FILE_NOT_FOUND) {
-//                    // write code as per need to handled this error
-//                }
-            }
-
-            override fun onResultReceived(result: String, audioFileId: String) {
-                Log.d("MainActivity", "Result: $result")
-                homeVewModel.saveTranscription(transcription = result, audioFileId = audioFileId) {
-                    showErrorMessage(it)
-                }
-            }
-        })
     }
 
     private fun getFilePath(assetName: String): String {

@@ -1,14 +1,12 @@
 package com.sergey.nes.recorder.ui.home
 
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sergey.nes.recorder.models.RecordingItem
 import com.sergey.nes.recorder.tools.AudioPlayer
+import com.sergey.nes.recorder.whispertflite.asr.IWhisperListener
 import com.sergey.nes.recorder.whispertflite.asr.Whisper
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,59 +17,135 @@ class HomeVewModel(
     private val whisper: Whisper? = null
 ) : ViewModel() {
 
-    private val _transcribing = MutableStateFlow(false)
-    val transcribing: StateFlow<Boolean> = _transcribing.asStateFlow()
+    init {
+        whisper?.setListener(object : IWhisperListener {
+            override fun onUpdateReceived(message: String) {
+                Log.d("MainActivity", "Update is received, Message: $message")
+//                if (message == Whisper.MSG_PROCESSING) {
+//                } else if (message == Whisper.MSG_FILE_NOT_FOUND) {
+//                    // write code as per need to handled this error
+//                }
+            }
 
-    private val _showDialog = MutableStateFlow(false)
-    val showDialog: StateFlow<Boolean> = _showDialog.asStateFlow()
-
-    fun onDialogConfirm() {
-        _showDialog.value = true
+            override fun onResultReceived(result: String, audioFileId: String) {
+                Log.d("MainActivity", "Result: $result")
+                saveTranscription(transcription = result, audioFileId = audioFileId)
+            }
+        })
     }
 
-    fun deleteTranscriptForTest() {
-        val index = _dataSource.value.selectedIndex
-        val recording = _dataSource.value.recordings[index]
-        saveTranscription("", audioFileId = recording.id) {
+    private val _uiState = MutableStateFlow<UiState>(UiState.Initial)
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    private fun StateFlow<UiState>.resolveContentState(): UiState.Content? {
+        (this.value as? UiState.Content)?.let {
+            return it
+        } ?: run { return null }
+    }
+
+    sealed class UiState {
+        data object Initial : UiState()
+        data class Loading(val recordings: List<RecordingItem> = emptyList()) : UiState()
+        data class Content(
+            val recordings: List<RecordingItem>,
+            val selectedIndex: Int,
+            val isPlaying: Boolean,
+            val isTranscribing: Boolean,
+            val showDialog: Boolean,
+            val error: String
+        ) : UiState() {
+            fun copy(
+                recordings: List<RecordingItem>? = null,
+                selectedIndex: Int? = null,
+                isPlaying: Boolean? = null,
+                transcribing: Boolean? = null,
+                showDialog: Boolean? = null,
+                error: String? = null
+            ): Content = Content(
+                recordings = recordings ?: this.recordings,
+                selectedIndex = selectedIndex ?: this.selectedIndex,
+                isPlaying = isPlaying ?: this.isPlaying,
+                isTranscribing = transcribing ?: this.isTranscribing,
+                showDialog = showDialog ?: this.showDialog,
+                error = error ?: this.error
+            )
+        }
+
+        data object Error : UiState()
+    }
+
+    fun onLoad(index: Int) = viewModelScope.launch {
+        _uiState.value = UiState.Loading()
+        repository.getRecordings().collect { result ->
+            result.fold(
+                onSuccess = { recordings ->
+                    val selectedIndex = if (index in 0..recordings.lastIndex) index else -1
+                    _uiState.value = UiState.Content(
+                        recordings = recordings,
+                        selectedIndex = selectedIndex,
+                        isPlaying = false,
+                        isTranscribing = false,
+                        showDialog = false,
+                        error = ""
+                    )
+                },
+                onFailure = { throwable ->
+                    _uiState.value = UiState.Error
+                }
+            )
         }
     }
 
-    fun onDialogDismiss() {
-        _showDialog.value = false
+
+    fun currentItem(): RecordingItem? = uiState.resolveContentState()?.let {
+        val index = it.selectedIndex
+        if (index in 0..it.recordings.lastIndex) {
+            return it.recordings[index]
+        } else return null
+    } ?: run {
+        return null
     }
 
-    private val _isPlaying: MutableState<Boolean> = mutableStateOf(false)
-    val isPlaying: State<Boolean> get() = _isPlaying
 
-    data class DataSourceState(
-        val recordings: List<RecordingItem> = emptyList(),
-        val selectedIndex: Int = -1
-    )
+    private fun resolveCurrentItem(valid: (RecordingItem, Int, UiState.Content) -> Unit) =
+        uiState.resolveContentState()?.let {
+            val index = it.selectedIndex
+            if (index in 0..it.recordings.lastIndex) {
+                val item = it.recordings[index]
+                valid(item, index, it)
+            }
+        }
 
-    private val _dataSource = MutableStateFlow(DataSourceState())
-    val dataSource: StateFlow<DataSourceState>
-        get() = _dataSource
 
-    fun saveTranscription(transcription: String, audioFileId: String?, onError: (String) -> Unit) =
-        viewModelScope.launch {
-            val index = _dataSource.value.selectedIndex
-            if (index in 0.._dataSource.value.recordings.lastIndex) {
-                val recording = _dataSource.value.recordings[index]
-                if (recording.id == audioFileId) {
-                    val save = recording.copy(transcription = transcription.trim())
+    fun transcribe() = resolveCurrentItem { item, _, state ->
+        if (item.transcription.isEmpty()) {
+            if (whisper?.isInProgress == true) {
+                onError("In the process")
+            } else {
+                whisper?.setFilePath(item)
+                whisper?.setAction(Whisper.ACTION_TRANSCRIBE)
+                whisper?.start()
+                _uiState.value = state.copy(isTranscribing = true)
+            }
+        } else {
+            onError("Already transcribed")
+        }
+    }
+
+
+    fun saveTranscription(transcription: String, audioFileId: String?) =
+        resolveCurrentItem { item, index, _ ->
+            viewModelScope.launch {
+                if (item.id == audioFileId) {
+                    val save = item.copy(transcription = transcription.trim())
                     repository.saveRecordingInfo(save).collect { result ->
                         result.fold(
                             onSuccess = {
-                                onLoad(ready = {
-                                    _dataSource.value = _dataSource.value.copy(selectedIndex = index)
-                                }, onError = {
-
-                                })
+                                onLoad(index)
                             },
                             onFailure = { throwable ->
-                                throwable.localizedMessage?.let {
-                                    onError(it)
+                                throwable.localizedMessage?.let { message ->
+                                    onError(message)
                                 } ?: run {
                                     onError("Unknown Error")
                                 }
@@ -80,68 +154,35 @@ class HomeVewModel(
                     }
                 }
             }
-            _transcribing.value = false
         }
 
-    fun saveInfo(
-        recording: RecordingItem,
-        ready: (DataSourceState) -> Unit,
-        onError: (String) -> Unit
-    ) =
-        viewModelScope.launch {
-            repository.saveRecordingInfo(recording).collect { result ->
-                result.fold(
-                    onSuccess = {
-                        onLoad(ready, onError)
-                    },
-                    onFailure = { throwable ->
-                        throwable.localizedMessage?.let {
-                            onError(it)
-                        } ?: run {
-                            onError("Unknown Error")
-                        }
+    fun saveInfo(recording: RecordingItem) = viewModelScope.launch {
+        repository.saveRecordingInfo(recording).collect { result ->
+            result.fold(
+                onSuccess = {
+                    onLoad(0)
+                },
+                onFailure = { throwable ->
+                    val message = throwable.localizedMessage ?: "Unknown Error"
+                    uiState.resolveContentState()?.let {
+                        _uiState.value = it.copy(error = message)
                     }
-                )
-            }
+                }
+            )
         }
+    }
 
-    fun onLoad(ready: (DataSourceState) -> Unit, onError: (String) -> Unit) =
+    fun deleteRecording() = resolveCurrentItem { item, index, _ ->
         viewModelScope.launch {
-            repository.getRecordings().collect { result ->
-                result.fold(
-                    onSuccess = { recordings ->
-                        _dataSource.value = DataSourceState(recordings)
-                        launch(Dispatchers.Main) {
-                            ready(_dataSource.value)
-                        }
-                    },
-                    onFailure = { throwable ->
-                        throwable.localizedMessage?.let {
-                            onError(it)
-                        } ?: run {
-                            onError("Unknown Error")
-                        }
-                    }
-                )
-            }
-        }
-
-    fun deleteRecording(onError: (String) -> Unit) = viewModelScope.launch {
-        val index = _dataSource.value.selectedIndex
-        if (index in 0.._dataSource.value.recordings.lastIndex) {
-            val item = _dataSource.value.recordings[index]
             repository.deleteRecording(item.id).collect { result ->
                 result.fold(
                     onSuccess = {
-                        onLoad(ready = {
-                            _dataSource.value = _dataSource.value.copy(selectedIndex = -1)
-                        }, onError = {
-
-                        })
+                        val select = if (index > 0) index - 1 else 0
+                        onLoad(select)
                     },
                     onFailure = { throwable ->
-                        throwable.localizedMessage?.let {
-                            onError(it)
+                        throwable.localizedMessage?.let { message ->
+                            onError(message)
                         } ?: run {
                             onError("Unknown Error")
                         }
@@ -151,50 +192,69 @@ class HomeVewModel(
         }
     }
 
-    fun selectRecording(index: Int, audioPlayer: AudioPlayer?) {
-        _dataSource.value = _dataSource.value.copy(selectedIndex = index)
-        if (index in 0.._dataSource.value.recordings.lastIndex) {
-            val item = _dataSource.value.recordings[index]
-            audioPlayer?.setCurrentFile(item)
+
+    fun selectRecording(index: Int, audioPlayer: AudioPlayer?) =
+        uiState.resolveContentState()?.let {
+            _uiState.value = it.copy(selectedIndex = index)
+            if (index in 0..it.recordings.lastIndex) {
+                val item = it.recordings[index]
+                audioPlayer?.setCurrentFile(item)
+            }
         }
+
+    private fun onError(value: String) = uiState.resolveContentState()?.let { state ->
+        _uiState.value = state.copy(error = value, transcribing = false, isPlaying = false)
     }
 
-    fun transcribe(onError: (String) -> Unit) {
-        val index = _dataSource.value.selectedIndex
-        if (index in 0.._dataSource.value.recordings.lastIndex) {
-            val item = _dataSource.value.recordings[index]
-            if (item.transcription.isEmpty()) {
-                if (whisper?.isInProgress == true) {
-                    onError("In the process")
-                } else {
-                    whisper?.setFilePath(item)
-                    whisper?.setAction(Whisper.ACTION_TRANSCRIBE)
-                    whisper?.start()
-                    _transcribing.value = true
-                }
-            } else {
-                onError("Already transcribed")
-            }
-        } else {
-            onError("Wrong index")
-        }
-    }
 
     fun onPlayCompleted(audioPlayer: AudioPlayer?) {
         audioPlayer?.stop()
-        _isPlaying.value = false
-        val nextIndex = _dataSource.value.selectedIndex + 1
-        if (_dataSource.value.recordings.lastIndex >= nextIndex) {
-            // play next in list
-            _isPlaying.value = true
-            selectRecording(nextIndex, audioPlayer)
-            audioPlayer?.pausePlay()
-        } else {
-            selectRecording(_dataSource.value.selectedIndex, audioPlayer)
+        updatePlaying(false)
+        uiState.resolveContentState()?.let {
+            val nextIndex = it.selectedIndex + 1
+            if (it.recordings.lastIndex >= nextIndex) {
+                // play next in list
+                updatePlaying(true)
+                selectRecording(nextIndex, audioPlayer)
+                audioPlayer?.pausePlay()
+            } else {
+                selectRecording(it.selectedIndex, audioPlayer)
+            }
         }
     }
 
-    fun updatePlaying(value: Boolean) {
-        _isPlaying.value = value
+    fun selectedIndex(): Int? {
+        return uiState.resolveContentState()?.selectedIndex
+    }
+
+    fun isNextAvailable(): Boolean {
+        uiState.resolveContentState()?.let {
+            return it.isPlaying && it.selectedIndex in 0..it.recordings.lastIndex
+        } ?: run {
+            return false
+        }
+    }
+
+    fun updatePlaying(value: Boolean) = uiState.resolveContentState()?.let {
+        _uiState.value = it.copy(isPlaying = value)
+    }
+
+
+    fun onDialogConfirm() = uiState.resolveContentState()?.let {
+        _uiState.value = it.copy(showDialog = true)
+    }
+
+    fun onDialogDismiss() = uiState.resolveContentState()?.let {
+        _uiState.value = it.copy(showDialog = false)
+    }
+
+    fun onErrorDialogDismiss() = uiState.resolveContentState()?.let {
+        _uiState.value = it.copy(error = "")
+    }
+
+    fun deleteTranscriptForTest() = uiState.resolveContentState()?.let {
+        val index = it.selectedIndex
+        val recording = it.recordings[index]
+        saveTranscription("", audioFileId = recording.id)
     }
 }

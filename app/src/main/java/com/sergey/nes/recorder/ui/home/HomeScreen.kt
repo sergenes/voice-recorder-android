@@ -65,10 +65,6 @@ class MainActivityForPreview : MainActivityInterface {
     override fun micPermissions(): Boolean {
         return false
     }
-
-    override fun showErrorMessage(message: String) {
-
-    }
 }
 
 @Preview(showBackground = true)
@@ -78,8 +74,7 @@ fun Preview() {
         HomeScreenView(
             MainActivityForPreview(),
             HomeVewModel(HomeRepository(), null),
-            null,
-            null
+            null, null
         )
     }
 }
@@ -135,10 +130,11 @@ fun HomeScreenView(
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-
     val onPlayCompletionListener = MediaPlayer.OnCompletionListener {
         viewModel.onPlayCompleted(audioPlayer)
     }
+    val uiState = viewModel.uiState.collectAsState().value
+
     var micPermission by remember { mutableStateOf(false) }
     micPermission = activity.micPermissions()
 
@@ -148,139 +144,216 @@ fun HomeScreenView(
         micPermission = it
     }
 
-    val dataSourceState = viewModel.dataSource.collectAsState().value
-    val recordings = dataSourceState.recordings
-    val selectedIndex = dataSourceState.selectedIndex
-    val isPlaying = viewModel.isPlaying
     val audioLength = audioPlayer?.audioLength?.value ?: 0
     val audioPlayback = audioPlayer?.audioPlayback?.value ?: 0f
-    val showDialog = viewModel.showDialog.collectAsState().value
-    val transcribing = viewModel.transcribing.collectAsState().value
 
     LaunchedEffect("Init") {
-        viewModel.onLoad(ready = {
-            if (it.recordings.isNotEmpty() && it.selectedIndex < 0) {
-                viewModel.selectRecording(0, audioPlayer)
-            }
-        }, onError = {
-            activity.showErrorMessage(it)
-        })
+        viewModel.onLoad(0)
         audioPlayer?.setCompletionListener(onPlayCompletionListener)
     }
 
     // animated scroll for auto play
-    LaunchedEffect(selectedIndex) {
-        if (viewModel.isPlaying.value && selectedIndex in 0..recordings.lastIndex) {
-            coroutineScope.launch {
-                listState.animateScrollToItem(selectedIndex)
+    LaunchedEffect(viewModel.selectedIndex()) {
+        viewModel.selectedIndex()?.let {
+            if (viewModel.isNextAvailable()) {
+                // autoplay block
+                coroutineScope.launch {
+                    listState.animateScrollToItem(it)
+                }
+            } else {
+                // set current audio to see the length in UI
+                viewModel.currentItem()?.let {
+                    audioPlayer?.setCurrentFile(it)
+                }
             }
         }
     }
 
     Box {
-        HomeViewContent(
-            params = Params(
-                recordings = recordings,
-                listState = listState,
-                selectedIndex = selectedIndex,
-                micPermission = micPermission,
-                isPlaying = isPlaying.value,
-                audioLength = audioLength,
-                audioPlayback = audioPlayback,
-                transcribing = transcribing,
-            ),
-            onUiAction = { action ->
-                when (action) {
-                    is UiAction.OnShare -> {
-                        //viewModel.deleteTranscriptForTest()
-                    }
+        when (uiState) {
+            HomeVewModel.UiState.Initial -> {
+                HomeViewLoading()
+            }
 
-                    UiAction.ActionDelete -> {
-                        viewModel.onDialogConfirm()
-                    }
+            is HomeVewModel.UiState.Loading -> {
+                HomeViewLoading()
+            }
 
-                    UiAction.OnPlayClicked -> {
-                        audioPlayer?.let {
-                            it.pausePlay()
-                            viewModel.updatePlaying(it.isPlaying())
-                        }
-                    }
+            is HomeVewModel.UiState.Content -> {
+                val recordings = uiState.recordings
+                val selectedIndex = uiState.selectedIndex
+                val isPlaying = uiState.isPlaying
+                val transcribing = uiState.isTranscribing
+                val showDialog = uiState.showDialog
+                val error = uiState.error
 
-                    is UiAction.OnRecordingStarted -> {
-                        if (!action.value) {
-                            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        } else {
-                            audioPlayer?.stop()
-                            viewModel.updatePlaying(false)
-                            audioRecorder?.start()
-                        }
-                    }
+                HomeViewContent(
+                    params = Params(
+                        recordings = recordings,
+                        listState = listState,
+                        selectedIndex = selectedIndex,
+                        micPermission = micPermission,
+                        isPlaying = isPlaying,
+                        audioLength = audioLength,
+                        audioPlayback = audioPlayback,
+                        transcribing = transcribing,
+                    ),
+                    onUiAction = { action ->
+                        when (action) {
+                            is UiAction.OnShare -> {
+                                //viewModel.deleteTranscriptForTest()
+                            }
 
-                    UiAction.OnRecordingStopped -> {
-                        audioRecorder?.stop()?.let {
-                            viewModel.saveInfo(it, ready = { dataSource ->
-                                if (dataSource.recordings.isNotEmpty()) {
-                                    viewModel.selectRecording(0, audioPlayer)
-                                    viewModel.updatePlaying(false)
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(0)
-                                    }
+                            UiAction.ActionDelete -> {
+                                viewModel.onDialogConfirm()
+                            }
+
+                            UiAction.OnPlayClicked -> {
+                                audioPlayer?.let {
+                                    it.pausePlay()
+                                    viewModel.updatePlaying(it.isPlaying())
                                 }
-                            }, onError = { error ->
-                                activity.showErrorMessage(error)
-                            })
+                            }
+
+                            is UiAction.OnRecordingStarted -> {
+                                if (!action.value) {
+                                    requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                } else {
+                                    audioPlayer?.stop()
+                                    audioRecorder?.start()
+                                }
+                            }
+
+                            UiAction.OnRecordingStopped -> {
+                                audioRecorder?.stop()?.let {
+                                    viewModel.saveInfo(it)
+                                }
+                            }
+
+                            is UiAction.OnSelected -> {
+                                viewModel.selectRecording(action.value, audioPlayer = audioPlayer)
+                                viewModel.updatePlaying(false)
+                            }
+
+                            is UiAction.OnSliderValueChange -> {
+                                audioPlayer?.updateAudioPlayback(action.value)
+                            }
+
+                            UiAction.OnTranscribe -> {
+                                viewModel.transcribe()
+                            }
                         }
                     }
-
-                    is UiAction.OnSelected -> {
-                        viewModel.selectRecording(action.value, audioPlayer)
-                        viewModel.updatePlaying(false)
-                    }
-
-                    is UiAction.OnSliderValueChange -> {
-                        audioPlayer?.updateAudioPlayback(action.value)
-                    }
-
-                    UiAction.OnTranscribe -> {
-                        viewModel.transcribe {
-                            activity.showErrorMessage(it)
-                        }
+                )
+                if (showDialog) {
+                    ConfirmDeletingDialog(onConfirm = {
+                        viewModel.onDialogDismiss()
+                        viewModel.deleteRecording()
+                    }) {
+                        viewModel.onDialogDismiss()
                     }
                 }
+                if (error.isNotEmpty()) {
+                    ErrorMessageDialog(error) { viewModel.onErrorDialogDismiss() }
+                }
             }
-        )
-        if (showDialog) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .alpha(0.7f)
-            ) {
-                AlertDialog(
-                    onDismissRequest = {
-                        viewModel.onDialogDismiss()
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            viewModel.onDialogDismiss()
-                            viewModel.deleteRecording {
-                                activity.showErrorMessage(it)
-                            }
-                        })
-                        { Text(text = stringResource(R.string.yes)) }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = {
-                            viewModel.onDialogDismiss()
-                        })
-                        { Text(text = stringResource(R.string.cancel)) }
-                    },
-                    title = { Text(text = stringResource(R.string.please_confirm_deleting)) },
-                    text = { Text(text = stringResource(R.string.are_you_sure_you_can_not_undo_this_action)) }
-                )
+
+            HomeVewModel.UiState.Error -> {
+                HomeViewError()
             }
         }
     }
+}
+
+@Composable
+fun ConfirmDeletingDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .alpha(0.7f)
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = onConfirm)
+                { Text(text = stringResource(R.string.yes)) }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss)
+                { Text(text = stringResource(R.string.cancel)) }
+            },
+            title = { Text(text = stringResource(R.string.please_confirm_deleting)) },
+            text = { Text(text = stringResource(R.string.are_you_sure_you_can_not_undo_this_action)) }
+        )
+    }
+}
+
+@Composable
+fun ErrorMessageDialog(message: String, onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .alpha(0.7f)
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = onDismiss)
+                { Text(text = stringResource(R.string.yes)) }
+            },
+
+            title = { Text(text = "Error") },
+            text = { Text(text = message) }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeViewError() {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            )
+        },
+        content = { innerPadding ->
+            Column(modifier = Modifier.padding(innerPadding)) {
+                Text(text = "Error...")
+            }
+        },
+        bottomBar = { })
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeViewLoading() {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            )
+        },
+        content = { innerPadding ->
+            Column(modifier = Modifier.padding(innerPadding)) {
+                Text(text = "Loading...")
+            }
+        },
+        bottomBar = { })
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
