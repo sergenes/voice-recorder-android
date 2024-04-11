@@ -87,9 +87,11 @@ fun PreviewList() {
         val list = listOf(RecordingItem(), RecordingItem())
         Column {
             LazyListForRecordings(
-                params = Params(
-                    recordings = list,
+                composableParams = ComposableParams(
                     listState = listState
+                ),
+                params = Params(
+                    recordings = list
                 )
             ) {
 
@@ -112,13 +114,16 @@ sealed interface UiAction {
 
 data class Params(
     val recordings: List<RecordingItem>,
-    val listState: LazyListState,
     val selectedIndex: Int = -1,
-    val micPermission: Boolean = false,
     val isPlaying: Boolean = false,
+    val transcribing: Boolean = false
+)
+
+data class ComposableParams(
+    val listState: LazyListState,
+    val micPermission: Boolean = false,
     val audioLength: Int = 0,
     val audioPlayback: Float = 0f,
-    val transcribing: Boolean = false
 )
 
 @Composable
@@ -128,10 +133,18 @@ fun HomeScreenView(
     audioPlayer: AudioPlayer?,
     audioRecorder: WAVRecorder?
 ) {
+    fun handleShareIntent() {
+        viewModel.handleIntent(HomeScreenIntent.OnShare)
+    }
+
+    fun handleOnDialogConfirm() {
+        viewModel.handleIntent(HomeScreenIntent.OnDialogConfirm)
+    }
+
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val onPlayCompletionListener = MediaPlayer.OnCompletionListener {
-        viewModel.onPlayCompleted(audioPlayer)
+        viewModel.handleIntent(HomeScreenIntent.OnPlayCompleted(audioPlayer))
     }
     val uiState = viewModel.uiState.collectAsState().value
 
@@ -148,7 +161,7 @@ fun HomeScreenView(
     val audioPlayback = audioPlayer?.audioPlayback?.value ?: 0f
 
     LaunchedEffect("Init") {
-        viewModel.onLoad(0)
+        viewModel.handleIntent(HomeScreenIntent.OnLoad(0))
         audioPlayer?.setCompletionListener(onPlayCompletionListener)
     }
 
@@ -180,38 +193,25 @@ fun HomeScreenView(
             }
 
             is HomeVewModel.UiState.Content -> {
-                val recordings = uiState.recordings
-                val selectedIndex = uiState.selectedIndex
-                val isPlaying = uiState.isPlaying
-                val transcribing = uiState.isTranscribing
                 val showDialog = uiState.showDialog
                 val error = uiState.error
 
                 HomeViewContent(
-                    params = Params(
-                        recordings = recordings,
+                    composableParams = ComposableParams(
                         listState = listState,
-                        selectedIndex = selectedIndex,
                         micPermission = micPermission,
-                        isPlaying = isPlaying,
                         audioLength = audioLength,
                         audioPlayback = audioPlayback,
-                        transcribing = transcribing,
                     ),
+                    params = uiState.extractParams(),
                     onUiAction = { action ->
                         when (action) {
-                            is UiAction.OnShare -> {
-                                //viewModel.deleteTranscriptForTest()
-                            }
-
-                            UiAction.ActionDelete -> {
-                                viewModel.onDialogConfirm()
-                            }
-
+                            UiAction.OnShare -> handleShareIntent()
+                            UiAction.ActionDelete -> handleOnDialogConfirm()
                             UiAction.OnPlayClicked -> {
                                 audioPlayer?.let {
                                     it.pausePlay()
-                                    viewModel.updatePlaying(it.isPlaying())
+                                    viewModel.handleIntent(HomeScreenIntent.OnPlayClicked(it.isPlaying()))
                                 }
                             }
 
@@ -226,13 +226,19 @@ fun HomeScreenView(
 
                             UiAction.OnRecordingStopped -> {
                                 audioRecorder?.stop()?.let {
-                                    viewModel.saveInfo(it)
+                                    viewModel.handleIntent(
+                                        HomeScreenIntent.OnRecordingStopped(it)
+                                    )
                                 }
                             }
 
                             is UiAction.OnSelected -> {
-                                viewModel.selectRecording(action.value, audioPlayer = audioPlayer)
-                                viewModel.updatePlaying(false)
+                                viewModel.handleIntent(
+                                    HomeScreenIntent.OnSelected(
+                                        action.value,
+                                        audioPlayer = audioPlayer
+                                    )
+                                )
                             }
 
                             is UiAction.OnSliderValueChange -> {
@@ -240,21 +246,22 @@ fun HomeScreenView(
                             }
 
                             UiAction.OnTranscribe -> {
-                                viewModel.transcribe()
+                                viewModel.handleIntent(HomeScreenIntent.OnTranscribe)
                             }
                         }
                     }
                 )
                 if (showDialog) {
                     ConfirmDeletingDialog(onConfirm = {
-                        viewModel.onDialogDismiss()
-                        viewModel.deleteRecording()
+                        viewModel.handleIntent(HomeScreenIntent.ActionDelete)
                     }) {
-                        viewModel.onDialogDismiss()
+                        viewModel.handleIntent(HomeScreenIntent.OnDialogDismiss)
                     }
                 }
                 if (error.isNotEmpty()) {
-                    ErrorMessageDialog(error) { viewModel.onErrorDialogDismiss() }
+                    ErrorMessageDialog(error) {
+                        viewModel.handleIntent(HomeScreenIntent.OnErrorDialogDismiss)
+                    }
                 }
             }
 
@@ -360,6 +367,7 @@ fun HomeViewLoading() {
 @Composable
 fun HomeViewContent(
     params: Params,
+    composableParams: ComposableParams,
     onUiAction: (UiAction) -> Unit = {}
 ) {
     Scaffold(
@@ -376,21 +384,25 @@ fun HomeViewContent(
         },
         content = { innerPadding ->
             Column(modifier = Modifier.padding(innerPadding)) {
-                if (!params.micPermission) {
+                if (!composableParams.micPermission) {
                     MicPermissionMessage()
                 }
                 if (params.recordings.isEmpty()) {
                     EmptyListMessage()
                 } else {
-                    LazyListForRecordings(params, onUiAction)
+                    LazyListForRecordings(composableParams, params, onUiAction)
                 }
             }
         },
-        bottomBar = { BottomBar(params, onUiAction) })
+        bottomBar = { BottomBar(composableParams, onUiAction) })
 }
 
 @Composable
-fun LazyListForRecordings(params: Params, onUiAction: (UiAction) -> Unit) {
+fun LazyListForRecordings(
+    composableParams: ComposableParams,
+    params: Params,
+    onUiAction: (UiAction) -> Unit
+) {
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val filteredItems =
         params.recordings.filter {
@@ -418,7 +430,7 @@ fun LazyListForRecordings(params: Params, onUiAction: (UiAction) -> Unit) {
             .padding(horizontal = normalSpace)
     )
     Spacer(modifier = Modifier.height(normalSpace))
-    LazyColumn(state = params.listState, modifier = Modifier.fillMaxHeight()) {
+    LazyColumn(state = composableParams.listState, modifier = Modifier.fillMaxHeight()) {
         items(filteredItems.size) { index ->
             val item = filteredItems[index]
             val title = item.dateTime.toDateTimeString()
@@ -428,8 +440,8 @@ fun LazyListForRecordings(params: Params, onUiAction: (UiAction) -> Unit) {
                     title = title,
                     transcription = transcription,
                     speaking = params.isPlaying,
-                    audioLength = params.audioLength,
-                    audioPlayback = params.audioPlayback,
+                    audioLength = composableParams.audioLength,
+                    audioPlayback = composableParams.audioPlayback,
                     actionPlay = { onUiAction(UiAction.OnPlayClicked) },
                     actionDelete = { onUiAction(UiAction.ActionDelete) },
                     onSliderValueChange = {
@@ -453,7 +465,7 @@ fun LazyListForRecordings(params: Params, onUiAction: (UiAction) -> Unit) {
 }
 
 @Composable
-fun BottomBar(params: Params, onUiAction: (UiAction) -> Unit) {
+fun BottomBar(composableParams: ComposableParams, onUiAction: (UiAction) -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -463,7 +475,7 @@ fun BottomBar(params: Params, onUiAction: (UiAction) -> Unit) {
     ) {
         RecordButton(
             maxDuration = RECORDING_DURATION,
-            micPermission = params.micPermission,
+            micPermission = composableParams.micPermission,
             onRecordingStarted = { onUiAction(UiAction.OnRecordingStarted(it)) },
             onRecordingStopped = { onUiAction(UiAction.OnRecordingStopped) }
         )

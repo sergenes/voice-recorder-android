@@ -34,10 +34,79 @@ class HomeVewModel(
         })
     }
 
+    fun currentItem(): RecordingItem? = uiState.contentState()?.let {
+        val index = it.selectedIndex
+        if (index in 0..it.recordings.lastIndex) {
+            return it.recordings[index]
+        } else return null
+    } ?: run {
+        return null
+    }
+
+    fun selectedIndex(): Int? {
+        return uiState.contentState()?.selectedIndex
+    }
+
+    fun isNextAvailable(): Boolean {
+        uiState.contentState()?.let {
+            return it.isPlaying && it.selectedIndex in 0..it.recordings.lastIndex
+        } ?: run {
+            return false
+        }
+    }
+
+    fun handleIntent(intent: HomeScreenIntent) {
+        when (intent) {
+            is HomeScreenIntent.OnLoad -> handleOnLoad(intent.index)
+            is HomeScreenIntent.OnSelected -> handleOnSelected(intent.index, intent.audioPlayer)
+            is HomeScreenIntent.OnPlayCompleted -> handleOnPlayCompleted(intent.audioPlayer)
+            is HomeScreenIntent.OnPlayClicked -> handleOnPlayClicked(intent.value)
+            is HomeScreenIntent.OnRecordingStopped -> handleOnRecordingStopped(intent.value)
+            HomeScreenIntent.ActionDelete -> handleActionDelete()
+            HomeScreenIntent.OnTranscribe -> handleOnTranscribe()
+            HomeScreenIntent.OnDialogConfirm -> onDialogConfirm()
+            HomeScreenIntent.OnDialogDismiss -> onDialogDismiss()
+            HomeScreenIntent.OnErrorDialogDismiss -> onErrorDialogDismiss()
+            HomeScreenIntent.OnShare -> handleOnShare()
+        }
+    }
+
+    private fun handleOnLoad(index: Int) {
+        onLoad(index)
+    }
+    private fun handleOnSelected(index: Int, audioPlayer: AudioPlayer?) {
+        selectRecording(index, audioPlayer)
+        updatePlaying(false)
+    }
+
+    private fun handleOnPlayCompleted(audioPlayer: AudioPlayer?) {
+        onPlayCompleted(audioPlayer)
+    }
+
+    private fun handleOnPlayClicked(value: Boolean) {
+        updatePlaying(value)
+    }
+
+    private fun handleActionDelete() {
+        deleteRecording()
+        onDialogDismiss()
+    }
+
+    private fun handleOnRecordingStopped(value: RecordingItem) {
+        saveInfo(value)
+    }
+
+    private fun handleOnTranscribe() {
+        transcribe()
+    }
+    private fun handleOnShare() {
+        //deleteTranscriptForTest()
+    }
+
     private val _uiState = MutableStateFlow<UiState>(UiState.Initial)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private fun StateFlow<UiState>.contentState(): UiState.Content? =
+    fun StateFlow<UiState>.contentState(): UiState.Content? =
         this.value as? UiState.Content
 
     sealed class UiState {
@@ -66,12 +135,21 @@ class HomeVewModel(
                 showDialog = showDialog ?: this.showDialog,
                 error = error ?: this.error
             )
+
+            fun extractParams(): Params {
+                return Params(
+                    recordings = this.recordings,
+                    selectedIndex = this.selectedIndex,
+                    isPlaying = this.isPlaying,
+                    transcribing = this.isTranscribing
+                )
+            }
         }
 
         data object Error : UiState()
     }
 
-    fun onLoad(index2Select: Int) = viewModelScope.launch {
+    private fun onLoad(index2Select: Int) = viewModelScope.launch {
         _uiState.value = UiState.Loading()
         repository.getRecordings().collect { result ->
             result.fold(
@@ -94,17 +172,6 @@ class HomeVewModel(
         }
     }
 
-
-    fun currentItem(): RecordingItem? = uiState.contentState()?.let {
-        val index = it.selectedIndex
-        if (index in 0..it.recordings.lastIndex) {
-            return it.recordings[index]
-        } else return null
-    } ?: run {
-        return null
-    }
-
-
     private fun resolveCurrentItem(resolved: (RecordingItem, Int, UiState.Content) -> Unit) =
         uiState.contentState()?.let {
             val index = it.selectedIndex
@@ -115,7 +182,7 @@ class HomeVewModel(
         }
 
 
-    fun transcribe() = resolveCurrentItem { item, _, state ->
+    private fun transcribe() = resolveCurrentItem { item, _, state ->
         if (item.transcription.isEmpty()) {
             if (whisper?.isInProgress == true) {
                 onSoftError("In the process")
@@ -131,7 +198,7 @@ class HomeVewModel(
     }
 
 
-    fun saveTranscription(transcription: String, audioFileId: String?) =
+    private fun saveTranscription(transcription: String, audioFileId: String?) =
         resolveCurrentItem { item, index, _ ->
             viewModelScope.launch {
                 if (item.id == audioFileId) {
@@ -154,7 +221,7 @@ class HomeVewModel(
             }
         }
 
-    fun saveInfo(recording: RecordingItem) = viewModelScope.launch {
+    private fun saveInfo(recording: RecordingItem) = viewModelScope.launch {
         repository.saveRecordingInfo(recording).collect { result ->
             result.fold(
                 onSuccess = {
@@ -170,7 +237,7 @@ class HomeVewModel(
         }
     }
 
-    fun deleteRecording() = resolveCurrentItem { item, index, _ ->
+    private fun deleteRecording() = resolveCurrentItem { item, index, _ ->
         viewModelScope.launch {
             repository.deleteRecording(item.id).collect { result ->
                 result.fold(
@@ -191,7 +258,7 @@ class HomeVewModel(
     }
 
 
-    fun selectRecording(index: Int, audioPlayer: AudioPlayer?) =
+    private fun selectRecording(index: Int, audioPlayer: AudioPlayer?) =
         uiState.contentState()?.let {
             _uiState.value = it.copy(selectedIndex = index)
             if (index in 0..it.recordings.lastIndex) {
@@ -205,7 +272,7 @@ class HomeVewModel(
     }
 
 
-    fun onPlayCompleted(audioPlayer: AudioPlayer?) {
+    private fun onPlayCompleted(audioPlayer: AudioPlayer?) {
         audioPlayer?.stop()
         updatePlaying(false)
         uiState.contentState()?.let {
@@ -221,36 +288,24 @@ class HomeVewModel(
         }
     }
 
-    fun selectedIndex(): Int? {
-        return uiState.contentState()?.selectedIndex
-    }
-
-    fun isNextAvailable(): Boolean {
-        uiState.contentState()?.let {
-            return it.isPlaying && it.selectedIndex in 0..it.recordings.lastIndex
-        } ?: run {
-            return false
-        }
-    }
-
-    fun updatePlaying(value: Boolean) = uiState.contentState()?.let {
+    private fun updatePlaying(value: Boolean) = uiState.contentState()?.let {
         _uiState.value = it.copy(isPlaying = value)
     }
 
 
-    fun onDialogConfirm() = uiState.contentState()?.let {
+    private fun onDialogConfirm() = uiState.contentState()?.let {
         _uiState.value = it.copy(showDialog = true)
     }
 
-    fun onDialogDismiss() = uiState.contentState()?.let {
+    private fun onDialogDismiss() = uiState.contentState()?.let {
         _uiState.value = it.copy(showDialog = false)
     }
 
-    fun onErrorDialogDismiss() = uiState.contentState()?.let {
+    private fun onErrorDialogDismiss() = uiState.contentState()?.let {
         _uiState.value = it.copy(error = "")
     }
 
-    fun deleteTranscriptForTest() = uiState.contentState()?.let {
+    private fun deleteTranscriptForTest() = uiState.contentState()?.let {
         val index = it.selectedIndex
         val recording = it.recordings[index]
         saveTranscription("", audioFileId = recording.id)
