@@ -37,10 +37,14 @@ implemented as a Kotlin Jetpack Compose project.
 ### Architecture
 
 - MVVM pattern:
-  - View: [HomeScreen](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeScreen.kt)
-  - Data Model: [RecordingItem](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/models/DataModels.kt)
-  - ViewModel: [HomeViewModel](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeViewModel.kt)
-  - Repository: [HomeRepository](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeRepository.kt)
+    -
+    View: [HomeScreen](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeScreen.kt)
+    - Data
+      Model: [RecordingItem](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/models/DataModels.kt)
+    -
+    ViewModel: [HomeViewModel](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeViewModel.kt)
+    -
+    Repository: [HomeRepository](https://github.com/sergenes/voice-recorder-android/blob/main/app/src/main/java/com/sergey/nes/recorder/ui/home/HomeRepository.kt)
 
 ## TODO:
 
@@ -61,10 +65,13 @@ only English audio to English text and Any Language audio to Translated to Engli
 includes the Whisper Tiny Model (39M parameters), TensorFlow Lite, and FlatBuffers.
 
 I updated the `transcribeFile` function in `TFLiteEngine.cpp` to support audio files longer than 30
-seconds, although testing has been limited to 60-second files.
+seconds, although testing has been limited to 60-second files. Also, I had to fix the wav recorder,
+as it saved wav file with the size of maximum buffer size regardless actual recording duration.
 
 ## How to generate TFLite model from Whisper
-The original Whisper models are in PyTorch format and needs to be converted into TensorFlow Lite format.
+
+The original Whisper models are in PyTorch format and needs to be converted into TensorFlow Lite
+format.
 [Google Colab](https://colab.research.google.com/github/usefulsensors/openai-whisper/blob/main/notebooks/generate_tflite_from_whisper.ipynb)
 
 ## Screenshots
@@ -83,7 +90,9 @@ The original Whisper models are in PyTorch format and needs to be converted into
  </table>
 
 ## Download
-Note that this APK contains whisper-tiny.tflite model, so it is heavy, around 100 MB. Also, make sure your Android device allows installation of APKs from sources other than Google Play.
+
+Note that this APK contains whisper-tiny.tflite model, so it is heavy, around 100 MB. Also, make
+sure your Android device allows installation of APKs from sources other than Google Play.
 [Story Rec Demo App](https://answersolutions.net/voice-rec-release.apk)
 
 ## Contact
