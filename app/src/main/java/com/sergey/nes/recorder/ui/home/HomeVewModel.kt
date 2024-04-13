@@ -100,7 +100,7 @@ class HomeVewModel(
         transcribe()
     }
     private fun handleOnShare() {
-        //deleteTranscriptForTest()
+        deleteTranscriptForTest()
     }
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Initial)

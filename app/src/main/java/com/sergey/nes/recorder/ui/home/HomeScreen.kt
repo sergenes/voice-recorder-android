@@ -1,6 +1,7 @@
 package com.sergey.nes.recorder.ui.home
 
 import android.Manifest
+import android.content.Context
 import android.media.MediaPlayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,6 +65,10 @@ import kotlinx.coroutines.launch
 class MainActivityForPreview : MainActivityInterface {
     override fun micPermissions(): Boolean {
         return false
+    }
+
+    override fun shareFileViaEmail(path: String, date: String) {
+        TODO("Not yet implemented")
     }
 }
 
@@ -206,7 +211,12 @@ fun HomeScreenView(
                     params = uiState.extractParams(),
                     onUiAction = { action ->
                         when (action) {
-                            UiAction.OnShare -> handleShareIntent()
+                            UiAction.OnShare -> {
+                                activity.shareFileViaEmail(
+                                    viewModel.currentItem()!!.id,
+                                    System.currentTimeMillis().toDateTimeString()
+                                )
+                            }//handleShareIntent()
                             UiAction.ActionDelete -> handleOnDialogConfirm()
                             UiAction.OnPlayClicked -> {
                                 audioPlayer?.let {

@@ -1,8 +1,11 @@
 package com.sergey.nes.recorder.app
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -13,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.sergey.nes.recorder.tools.AudioPlayer
 import com.sergey.nes.recorder.ui.home.HomeRepository
 import com.sergey.nes.recorder.ui.home.HomeScreenView
@@ -27,6 +31,7 @@ import java.io.OutputStream
 
 interface MainActivityInterface {
     fun micPermissions(): Boolean
+    fun shareFileViaEmail(path: String, date: String)
 }
 
 class MainActivity : ComponentActivity(), MainActivityInterface {
@@ -73,10 +78,15 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
         val modelPath: String
         val vocabPath: String
         val useMultilingual = true
+        val useHe = true
 
-        if (useMultilingual) {
+        if (useHe) {
             // Multilingual model and vocab
-            modelPath = getFilePath("whisper-tiny.tflite")
+            modelPath = getFilePath("whisper-tiny-he.tflite")
+            vocabPath = getFilePath("filters_vocab_multilingual.bin")
+        } else if (useMultilingual) {
+            // Multilingual model and vocab
+            modelPath = getFilePath("whisper.tflite")
             vocabPath = getFilePath("filters_vocab_multilingual.bin")
         } else {
             // English-only model and vocab
@@ -137,6 +147,41 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
             }
         } catch (e: IOException) {
             e.printStackTrace()
+        }
+    }
+
+    @SuppressLint("IntentReset")
+    override fun shareFileViaEmail(path: String, date: String) {
+
+            val fileName = "${path}.${Config.FILE_EXTENSION}"
+            val audioFile = File(
+                getExternalFilesDir(Config.RECORDINGS_FOLDER),
+                fileName
+            )
+
+        println("shareViaEmail.path=>${path}")
+        try {
+            val fileUri =
+                FileProvider.getUriForFile(this, "${packageName}.fileprovider", audioFile)
+            println("shareViaEmail.fileUri=>${fileUri}")
+            grantUriPermission(packageName, fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            val utype = contentResolver.getType(fileUri)
+            println("shareViaEmail.utype=>${utype}")
+            val message =
+                "This audio file was recorded with the 'Story Rec Demo App',\n\n\nplease visit https://github.com/sergenes/voice-recorder-android for more information."
+
+            val emailIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "*/*"
+                data = Uri.parse("mailto:")
+                putExtra(Intent.EXTRA_SUBJECT, "Story Rec Demo App at: $date")
+                putExtra(Intent.EXTRA_TEXT, message)
+                putExtra(Intent.EXTRA_STREAM, fileUri)
+                setDataAndType(fileUri, utype)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(emailIntent, "Share Recording"))
+        } catch (e: Exception) {
+            println("is exception raises during sending mail$e")
         }
     }
 }
