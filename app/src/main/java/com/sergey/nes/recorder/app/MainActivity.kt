@@ -78,7 +78,7 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
         val modelPath: String
         val vocabPath: String
         val useMultilingual = true
-        val useHe = true
+        val useHe = false
 
         if (useHe) {
             // Multilingual model and vocab

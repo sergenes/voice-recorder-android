@@ -113,7 +113,7 @@ int TFLiteEngine::loadModel(const char *modelPath, const bool isMultilingual) {
                 word = "[_extra_token_" + std::to_string(i) + "]";
             }
             g_vocab.id_to_token[i] = word;
-            // printf("%s: g_vocab[%d] = '%s'", __func__, i, word.c_str());
+            printf("%s: g_vocab[%d] = '%s'", __func__, i, word.c_str());
         }
 
 
@@ -126,11 +126,11 @@ int TFLiteEngine::loadModel(const char *modelPath, const bool isMultilingual) {
             return -1;
         }
 
-        // Get the size of the model file
+        // Get the size of the model file /39899312
         std::streamsize size = modelFile.tellg();
         modelFile.seekg(0, std::ios::beg);
 
-        // Allocate memory for the model buffer
+        // Allocate memory for the model buffer //0x7669fc4cc0
         char *buffer = new char[size];
 
         // Read the model data into the buffer
@@ -152,11 +152,17 @@ int TFLiteEngine::loadModel(const char *modelPath, const bool isMultilingual) {
 
         builder(&(g_whisper_tflite.interpreter));
         TFLITE_MINIMAL_CHECK(g_whisper_tflite.interpreter != nullptr);
+        if (g_whisper_tflite.interpreter == nullptr) {
+            return 0;
+        }
 
         // Allocate tensor buffers.
         TFLITE_MINIMAL_CHECK(g_whisper_tflite.interpreter->AllocateTensors() == kTfLiteOk);
 
         g_whisper_tflite.input = g_whisper_tflite.interpreter->typed_input_tensor<float>(0);
+        if (g_whisper_tflite.input == nullptr) {
+            return 0;
+        }
         g_whisper_tflite.is_whisper_tflite_initialized = true;
 
         gettimeofday(&end_time, NULL);
@@ -172,9 +178,15 @@ std::string TFLiteEngine::transcribeBuffer(std::vector<float> samples) {
     timeval start_time{}, end_time{};
     gettimeofday(&start_time, NULL);
 
-    // Hack if the audio file size is less than 30ms append with 0's
-    samples.resize((WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE), 0);
+//    // Hack if the audio file size is less than 30ms append with 0's
+//    samples.resize((WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE), 0);
     const auto processor_count = std::thread::hardware_concurrency();
+
+    // Resize the samples vector if it's smaller than the required chunk size
+    const int requiredSamples = WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE;
+    if (samples.size() < requiredSamples) {
+        samples.resize(requiredSamples, 0.0f);
+    }
 
     if (!log_mel_spectrogram(samples.data(), samples.size(), WHISPER_SAMPLE_RATE, WHISPER_N_FFT,
                              WHISPER_HOP_LENGTH, WHISPER_N_MEL, processor_count, filters, mel)) {
@@ -186,8 +198,20 @@ std::string TFLiteEngine::transcribeBuffer(std::vector<float> samples) {
     std::cout << "Time taken for Spectrogram: " << TIME_DIFF_MS(start_time, end_time) << " ms"
               << std::endl;
 
+    //mel.n_mel * mel.n_len * sizeof(float)
+    const int inputSize = mel.n_mel * mel.n_len * sizeof(float);
     if (INFERENCE_ON_AUDIO_FILE) {
-        memcpy(g_whisper_tflite.input, mel.data.data(), mel.n_mel * mel.n_len * sizeof(float));
+        if (g_whisper_tflite.input == nullptr) {
+            std::cerr << "Invalid input tensor or mel data1" << std::endl;
+            return "";
+        } else if (mel.data.data() == nullptr) {
+            std::cerr << "Invalid input tensor or mel data2" << std::endl;
+            return "";
+        } else if (mel.data.size() < inputSize) {
+            std::cerr << "Invalid input tensor or mel data3" << std::endl;
+            return "";
+        }
+        memcpy(g_whisper_tflite.input, mel.data.data(), inputSize);
     } else {
         memcpy(g_whisper_tflite.input, _content_input_features_bin,
                WHISPER_N_MEL * WHISPER_MEL_LEN *
@@ -227,6 +251,78 @@ std::string TFLiteEngine::transcribeBuffer(std::vector<float> samples) {
 
     return text;
 }
+
+//std::string TFLiteEngine::transcribeBuffer2(std::vector<float> samples) {
+//    timeval start_time{}, end_time{};
+//    gettimeofday(&start_time, nullptr);
+//
+//    // Resize the samples vector if it's smaller than the required chunk size
+//    const int requiredSamples = WHISPER_SAMPLE_RATE * WHISPER_CHUNK_SIZE;
+//    if (samples.size() < requiredSamples) {
+//        samples.resize(requiredSamples, 0.0f);
+//    }
+//
+//    const auto processor_count = std::thread::hardware_concurrency();
+//    if (!log_mel_spectrogram(samples.data(), samples.size(), WHISPER_SAMPLE_RATE, WHISPER_N_FFT, WHISPER_HOP_LENGTH, WHISPER_N_MEL, processor_count, filters, mel)) {
+//        std::cerr << "Failed to compute mel spectrogram" << std::endl;
+//        return "";
+//    }
+//
+//    gettimeofday(&end_time, nullptr);
+//    std::cout << "Time taken for Spectrogram: " << TIME_DIFF_MS(start_time, end_time) << " ms" << std::endl;
+//
+//    const int inputSize = WHISPER_N_MEL * WHISPER_MEL_LEN * sizeof(float);
+//    if (INFERENCE_ON_AUDIO_FILE) {
+//        if (g_whisper_tflite.input == nullptr || mel.data.data() == nullptr || mel.data.size() < inputSize) {
+//            std::cerr << "Invalid input tensor or mel data" << std::endl;
+//            return "";
+//        }
+//        memcpy(g_whisper_tflite.input, mel.data.data(), inputSize);
+//    } else {
+////        if (g_whisper_tflite.input == nullptr || contentinput_features_bin == nullptr) {
+////            std::cerr << "Invalid input tensor or pre-generated input features" << std::endl;
+////            return "";
+////        }
+////        memcpy(g_whisper_tflite.input, contentinput_features_bin, inputSize);
+//    }
+//
+//    gettimeofday(&start_time, nullptr);
+//
+//    // Run inference
+//    g_whisper_tflite.interpreter->SetNumThreads(processor_count);
+//    if (g_whisper_tflite.interpreter->Invoke() != kTfLiteOk) {
+//        std::cerr << "Failed to invoke TensorFlow Lite interpreter" << std::endl;
+//        return "";
+//    }
+//
+//    gettimeofday(&end_time, nullptr);
+//    std::cout << "Time taken for Interpreter: " << TIME_DIFF_MS(start_time, end_time) << " ms" << std::endl;
+//
+//    const int output = g_whisper_tflite.interpreter->outputs()[0];
+//    const TfLiteTensor* output_tensor = g_whisper_tflite.interpreter->tensor(output);
+//    const TfLiteIntArray* output_dims = output_tensor->dims;
+//
+//    // Check if the output dimensions are valid
+//    if (output_dims->size < 1) {
+//        std::cerr << "Invalid output tensor dimensions" << std::endl;
+//        return "";
+//    }
+//
+//    const int output_size = output_dims->data[output_dims->size - 1];
+//    const int* output_int = g_whisper_tflite.interpreter->typed_output_tensor<int>(0);
+//
+//    std::string text;
+//    for (int i = 0; i < output_size; i++) {
+//        if (output_int[i] == g_vocab.token_eot) {
+//            break;
+//        }
+//        if (output_int[i] < g_vocab.token_eot) {
+//            text += whisper_token_to_str(output_int[i]);
+//        }
+//    }
+//
+//    return text;
+//}
 
 std::string TFLiteEngine::transcribeFile(const char *waveFile) {
 //    std::vector<float> pcmf32 = readWAVFile(waveFile);
