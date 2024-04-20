@@ -17,10 +17,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.sergey.nes.recorder.tools.AudioPlayer
 import com.sergey.nes.recorder.ui.home.HomeRepository
 import com.sergey.nes.recorder.ui.home.HomeScreenView
 import com.sergey.nes.recorder.ui.home.HomeVewModel
+import com.sergey.nes.recorder.ui.settings.SettingsScreenView
 import com.sergey.nes.recorder.ui.theme.StoryRecTheme
 import com.sergey.nes.recorder.whispertflite.asr.WAVRecorder
 import com.sergey.nes.recorder.whispertflite.asr.Whisper
@@ -30,7 +34,6 @@ import java.io.IOException
 import java.io.OutputStream
 
 interface MainActivityInterface {
-    fun micPermissions(): Boolean
     fun shareFileViaEmail(path: String, date: String)
 }
 
@@ -41,7 +44,7 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
     private val whisper by lazy { Whisper(this) }
 
 
-    override fun micPermissions(): Boolean {
+    private fun micPermissions(): Boolean {
         // Check if the permission has already been granted
         val permissionStatus =
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
@@ -54,20 +57,37 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val homeRepository = HomeRepository(this)
-        val homeVewModel = HomeVewModel(repository = homeRepository, whisper = whisper)
+
         setContent {
             StoryRecTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    HomeScreenView(
-                        activity = this,
-                        viewModel = homeVewModel,
-                        audioPlayer = audioPlayer,
-                        audioRecorder = audioRecorder
+                    val navController = rememberNavController()
+                    val homeRepository = HomeRepository(this)
+                    val homeVewModel = HomeVewModel(
+                        micPermission = micPermissions(),
+                        repository = homeRepository,
+                        whisper = whisper,
+                        navController = navController
                     )
+                    NavHost(navController, startDestination = "home") {
+                        composable("home") {
+                            HomeScreenView(
+                                activity = this@MainActivity,
+                                viewModel = homeVewModel,
+                                audioPlayer = audioPlayer,
+                                audioRecorder = audioRecorder
+                            )
+                        }
+                        composable("settings") {
+                            SettingsScreenView(
+                                activity = this@MainActivity
+                            )
+                        }
+                    }
+
                 }
             }
         }
@@ -153,18 +173,18 @@ class MainActivity : ComponentActivity(), MainActivityInterface {
     @SuppressLint("IntentReset")
     override fun shareFileViaEmail(path: String, date: String) {
 
-            val fileName = "${path}.${Config.FILE_EXTENSION}"
-            val audioFile = File(
-                getExternalFilesDir(Config.RECORDINGS_FOLDER),
-                fileName
-            )
+        val fileName = "${path}.${Config.FILE_EXTENSION}"
+        val audioFile = File(
+            getExternalFilesDir(Config.RECORDINGS_FOLDER),
+            fileName
+        )
 
         println("shareViaEmail.path=>${path}")
         try {
             val fileUri =
                 FileProvider.getUriForFile(this, "${packageName}.fileprovider", audioFile)
             println("shareViaEmail.fileUri=>${fileUri}")
-            grantUriPermission(packageName, fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            grantUriPermission(packageName, fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             val utype = contentResolver.getType(fileUri)
             println("shareViaEmail.utype=>${utype}")
             val message =

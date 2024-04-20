@@ -3,6 +3,7 @@ package com.sergey.nes.recorder.ui.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavController
 import com.sergey.nes.recorder.models.RecordingItem
 import com.sergey.nes.recorder.tools.AudioPlayer
 import com.sergey.nes.recorder.ui.UiLCEState
@@ -14,8 +15,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class HomeVewModel(
+    private val micPermission: Boolean = false,
     private val repository: HomeRepository,
-    private val whisper: Whisper? = null
+    private val whisper: Whisper? = null,
+    private val navController: NavController? = null
 ) : ViewModel() {
 
     init {
@@ -69,7 +72,17 @@ class HomeVewModel(
             HomeScreenIntent.OnDialogDismiss -> onDialogDismiss()
             HomeScreenIntent.OnErrorDialogDismiss -> onErrorDialogDismiss()
             HomeScreenIntent.OnShare -> handleOnShare()
+            HomeScreenIntent.OnSettings -> handleOnSettings()
+            is HomeScreenIntent.OnPermissionUpdate -> handlePermissionUpdate(intent.value)
         }
+    }
+
+    private fun handlePermissionUpdate(value: Boolean) = uiState.contentState()?.let {
+        _uiState.value = it.copy(micPermission = value).contentValue()
+    }
+
+    private fun handleOnSettings() {
+        navController?.navigate("settings")
     }
 
     private fun handleOnLoad(index: Int) {
@@ -117,16 +130,19 @@ class HomeVewModel(
                 onSuccess = { recordings ->
                     val selectedIndex =
                         if (index2Select in 0..recordings.lastIndex) index2Select else -1
-                    _uiState.value = UiLCEState.Content(HomeUiState(
-                        recordings = recordings,
-                        selectedIndex = selectedIndex,
-                        isPlaying = false,
-                        isTranscribing = false,
-                        showDialog = false,
-                        error = ""
-                    ))
+                    _uiState.value = UiLCEState.Content(
+                        HomeUiState(
+                            recordings = recordings,
+                            selectedIndex = selectedIndex,
+                            isPlaying = false,
+                            isTranscribing = false,
+                            showDialog = false,
+                            micPermission = micPermission,
+                            error = ""
+                        )
+                    )
                 },
-                onFailure = { throwable ->
+                onFailure = {
                     _uiState.value = UiLCEState.Error
                 }
             )
@@ -229,7 +245,8 @@ class HomeVewModel(
         }
 
     private fun onSoftError(value: String) = uiState.contentState()?.let { state ->
-        _uiState.value = state.copy(isPlaying = false, isTranscribing = false, error = value).contentValue()
+        _uiState.value =
+            state.copy(isPlaying = false, isTranscribing = false, error = value).contentValue()
     }
 
 

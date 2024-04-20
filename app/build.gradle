@@ -77,6 +77,9 @@ dependencies {
     implementation libs.androidx.material.icons.extended
     implementation(libs.kotlinx.serialization.json)
     //
-    implementation 'org.tensorflow:tensorflow-lite:2.11.0'
-    implementation 'org.tensorflow:tensorflow-lite-support:0.4.3'
+    implementation libs.tensorflow.lite
+    implementation libs.tensorflow.lite.support
+    //
+    implementation libs.accompanist.navigation.animation
+    implementation libs.androidx.navigation.runtime.ktx
 }

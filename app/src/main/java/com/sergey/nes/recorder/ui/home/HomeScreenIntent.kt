@@ -15,6 +15,8 @@ sealed class HomeScreenIntent {
     data class OnRecordingStopped(val value: RecordingItem) : HomeScreenIntent()
     data object OnTranscribe : HomeScreenIntent()
     data object OnShare : HomeScreenIntent()
+    data object OnSettings : HomeScreenIntent()
+    data class OnPermissionUpdate(val value: Boolean) : HomeScreenIntent()
 }
 
 sealed interface UiAction {
@@ -26,4 +28,5 @@ sealed interface UiAction {
     data object OnRecordingStopped : UiAction
     data object OnTranscribe : UiAction
     data object OnShare : UiAction
+    data object OnSettings : UiAction
 }

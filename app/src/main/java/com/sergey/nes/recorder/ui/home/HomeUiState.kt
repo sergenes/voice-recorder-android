@@ -12,6 +12,7 @@ data class HomeUiState(
     val isPlaying: Boolean,
     val isTranscribing: Boolean,
     val showDialog: Boolean,
+    val micPermission: Boolean,
     val error: String
 ) : ContentUIState<HomeUiState, HomeUiState.Params> {
 
@@ -22,6 +23,7 @@ data class HomeUiState(
             isPlaying = this.isPlaying,
             transcribing = this.isTranscribing,
             showDialog = this.showDialog,
+            micPermission = this.micPermission,
             error = this.error
         )
     }
@@ -36,13 +38,12 @@ data class HomeUiState(
         val isPlaying: Boolean = false,
         val transcribing: Boolean = false,
         val showDialog: Boolean = false,
+        val micPermission: Boolean = false,
         val error: String = ""
     )
 }
 
-data class ComposableParams(
-    val listState: LazyListState,
-    val micPermission: Boolean = false,
+data class AudioPlaybackParams(
     val audioLength: Int = 0,
     val audioPlayback: Float = 0f,
 )
