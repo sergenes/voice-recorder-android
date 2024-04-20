@@ -16,3 +16,14 @@ sealed class HomeScreenIntent {
     data object OnTranscribe : HomeScreenIntent()
     data object OnShare : HomeScreenIntent()
 }
+
+sealed interface UiAction {
+    data class OnSelected(val value: Int) : UiAction
+    data class OnRecordingStarted(val value: Boolean) : UiAction
+    data class OnSliderValueChange(val value: Float) : UiAction
+    data object OnPlayClicked : UiAction
+    data object ActionDelete : UiAction
+    data object OnRecordingStopped : UiAction
+    data object OnTranscribe : UiAction
+    data object OnShare : UiAction
+}

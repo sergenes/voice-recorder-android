@@ -1,7 +1,6 @@
 package com.sergey.nes.recorder.ui.home
 
 import android.Manifest
-import android.content.Context
 import android.media.MediaPlayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -57,6 +55,8 @@ import com.sergey.nes.recorder.ui.components.RecordButton
 import com.sergey.nes.recorder.ui.components.SelectedItemView
 import com.sergey.nes.recorder.models.RecordingItem
 import com.sergey.nes.recorder.tools.AudioPlayer
+import com.sergey.nes.recorder.ui.UiLCEState
+import com.sergey.nes.recorder.ui.resolve
 import com.sergey.nes.recorder.ui.theme.StoryRecTheme
 import com.sergey.nes.recorder.ui.theme.normalSpace
 import com.sergey.nes.recorder.whispertflite.asr.WAVRecorder
@@ -95,7 +95,7 @@ fun PreviewList() {
                 composableParams = ComposableParams(
                     listState = listState
                 ),
-                params = Params(
+                params = HomeUiState.Params(
                     recordings = list
                 )
             ) {
@@ -105,31 +105,6 @@ fun PreviewList() {
 
     }
 }
-
-sealed interface UiAction {
-    data class OnSelected(val value: Int) : UiAction
-    data class OnRecordingStarted(val value: Boolean) : UiAction
-    data class OnSliderValueChange(val value: Float) : UiAction
-    data object OnPlayClicked : UiAction
-    data object ActionDelete : UiAction
-    data object OnRecordingStopped : UiAction
-    data object OnTranscribe : UiAction
-    data object OnShare : UiAction
-}
-
-data class Params(
-    val recordings: List<RecordingItem>,
-    val selectedIndex: Int = -1,
-    val isPlaying: Boolean = false,
-    val transcribing: Boolean = false
-)
-
-data class ComposableParams(
-    val listState: LazyListState,
-    val micPermission: Boolean = false,
-    val audioLength: Int = 0,
-    val audioPlayback: Float = 0f,
-)
 
 @Composable
 fun HomeScreenView(
@@ -189,17 +164,17 @@ fun HomeScreenView(
 
     Box {
         when (uiState) {
-            HomeVewModel.UiState.Initial -> {
+            UiLCEState.Initial -> {
                 HomeViewLoading()
             }
 
-            is HomeVewModel.UiState.Loading -> {
+            is UiLCEState.Loading -> {
                 HomeViewLoading()
             }
 
-            is HomeVewModel.UiState.Content -> {
-                val showDialog = uiState.showDialog
-                val error = uiState.error
+            is UiLCEState.Content<HomeUiState> -> {
+                val showDialog = uiState.resolve().showDialog
+                val error = uiState.resolve().error
 
                 HomeViewContent(
                     composableParams = ComposableParams(
@@ -208,7 +183,7 @@ fun HomeScreenView(
                         audioLength = audioLength,
                         audioPlayback = audioPlayback,
                     ),
-                    params = uiState.extractParams(),
+                    params = uiState.resolve().extractParams(),
                     onUiAction = { action ->
                         when (action) {
                             UiAction.OnShare -> {
@@ -275,7 +250,7 @@ fun HomeScreenView(
                 }
             }
 
-            HomeVewModel.UiState.Error -> {
+            UiLCEState.Error -> {
                 HomeViewError()
             }
         }
@@ -376,7 +351,7 @@ fun HomeViewLoading() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeViewContent(
-    params: Params,
+    params: HomeUiState.Params,
     composableParams: ComposableParams,
     onUiAction: (UiAction) -> Unit = {}
 ) {
@@ -410,7 +385,7 @@ fun HomeViewContent(
 @Composable
 fun LazyListForRecordings(
     composableParams: ComposableParams,
-    params: Params,
+    params: HomeUiState.Params,
     onUiAction: (UiAction) -> Unit
 ) {
     var query by remember { mutableStateOf(TextFieldValue("")) }

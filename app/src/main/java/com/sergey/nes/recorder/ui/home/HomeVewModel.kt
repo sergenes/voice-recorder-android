@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sergey.nes.recorder.models.RecordingItem
 import com.sergey.nes.recorder.tools.AudioPlayer
+import com.sergey.nes.recorder.ui.UiLCEState
 import com.sergey.nes.recorder.whispertflite.asr.IWhisperListener
 import com.sergey.nes.recorder.whispertflite.asr.Whisper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,76 +104,36 @@ class HomeVewModel(
         deleteTranscriptForTest()
     }
 
-    private val _uiState = MutableStateFlow<UiState>(UiState.Initial)
-    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow<UiLCEState<HomeUiState>>(UiLCEState.Initial)
+    val uiState: StateFlow<UiLCEState<HomeUiState>> = _uiState.asStateFlow()
 
-    fun StateFlow<UiState>.contentState(): UiState.Content? =
-        this.value as? UiState.Content
-
-    sealed class UiState {
-        data object Initial : UiState()
-        data class Loading(val recordings: List<RecordingItem> = emptyList()) : UiState()
-        data class Content(
-            val recordings: List<RecordingItem>,
-            val selectedIndex: Int,
-            val isPlaying: Boolean,
-            val isTranscribing: Boolean,
-            val showDialog: Boolean,
-            val error: String
-        ) : UiState() {
-            fun copy(
-                recordings: List<RecordingItem>? = null,
-                selectedIndex: Int? = null,
-                isPlaying: Boolean? = null,
-                transcribing: Boolean? = null,
-                showDialog: Boolean? = null,
-                error: String? = null
-            ): Content = Content(
-                recordings = recordings ?: this.recordings,
-                selectedIndex = selectedIndex ?: this.selectedIndex,
-                isPlaying = isPlaying ?: this.isPlaying,
-                isTranscribing = transcribing ?: this.isTranscribing,
-                showDialog = showDialog ?: this.showDialog,
-                error = error ?: this.error
-            )
-
-            fun extractParams(): Params {
-                return Params(
-                    recordings = this.recordings,
-                    selectedIndex = this.selectedIndex,
-                    isPlaying = this.isPlaying,
-                    transcribing = this.isTranscribing
-                )
-            }
-        }
-
-        data object Error : UiState()
-    }
+    private fun StateFlow<UiLCEState<HomeUiState>>.contentState(): HomeUiState? =
+        (this.value as? UiLCEState.Content<HomeUiState>)?.data
 
     private fun onLoad(index2Select: Int) = viewModelScope.launch {
-        _uiState.value = UiState.Loading()
+        _uiState.value = UiLCEState.Loading
         repository.getRecordings().collect { result ->
             result.fold(
                 onSuccess = { recordings ->
                     val selectedIndex =
                         if (index2Select in 0..recordings.lastIndex) index2Select else -1
-                    _uiState.value = UiState.Content(
+                    _uiState.value = UiLCEState.Content(HomeUiState(
                         recordings = recordings,
                         selectedIndex = selectedIndex,
                         isPlaying = false,
                         isTranscribing = false,
                         showDialog = false,
                         error = ""
-                    )
+                    ))
                 },
                 onFailure = { throwable ->
-                    _uiState.value = UiState.Error
+                    _uiState.value = UiLCEState.Error
                 }
             )
         }
     }
 
-    private fun resolveCurrentItem(resolved: (RecordingItem, Int, UiState.Content) -> Unit) =
+    private fun resolveCurrentItem(resolved: (RecordingItem, Int, HomeUiState) -> Unit) =
         uiState.contentState()?.let {
             val index = it.selectedIndex
             if (index in 0..it.recordings.lastIndex) {
@@ -190,7 +151,7 @@ class HomeVewModel(
                 whisper?.setFilePath(item)
                 whisper?.setAction(Whisper.ACTION_TRANSCRIBE)
                 whisper?.start()
-                _uiState.value = state.copy(isTranscribing = true)
+                _uiState.value = state.copy(isTranscribing = true).contentValue()
             }
         } else {
             onSoftError("Already transcribed")
@@ -230,7 +191,7 @@ class HomeVewModel(
                 onFailure = { throwable ->
                     val message = throwable.localizedMessage ?: "Unknown Error"
                     uiState.contentState()?.let {
-                        _uiState.value = it.copy(error = message)
+                        _uiState.value = UiLCEState.Content(it.copy(error = message))
                     }
                 }
             )
@@ -260,7 +221,7 @@ class HomeVewModel(
 
     private fun selectRecording(index: Int, audioPlayer: AudioPlayer?) =
         uiState.contentState()?.let {
-            _uiState.value = it.copy(selectedIndex = index)
+            _uiState.value = UiLCEState.Content(it.copy(selectedIndex = index))
             if (index in 0..it.recordings.lastIndex) {
                 val item = it.recordings[index]
                 audioPlayer?.setCurrentFile(item)
@@ -268,7 +229,7 @@ class HomeVewModel(
         }
 
     private fun onSoftError(value: String) = uiState.contentState()?.let { state ->
-        _uiState.value = state.copy(error = value, transcribing = false, isPlaying = false)
+        _uiState.value = state.copy(isPlaying = false, isTranscribing = false, error = value).contentValue()
     }
 
 
@@ -289,20 +250,20 @@ class HomeVewModel(
     }
 
     private fun updatePlaying(value: Boolean) = uiState.contentState()?.let {
-        _uiState.value = it.copy(isPlaying = value)
+        _uiState.value = it.copy(isPlaying = value).contentValue()
     }
 
 
     private fun onDialogConfirm() = uiState.contentState()?.let {
-        _uiState.value = it.copy(showDialog = true)
+        _uiState.value = it.copy(showDialog = true).contentValue()
     }
 
     private fun onDialogDismiss() = uiState.contentState()?.let {
-        _uiState.value = it.copy(showDialog = false)
+        _uiState.value = it.copy(showDialog = false).contentValue()
     }
 
     private fun onErrorDialogDismiss() = uiState.contentState()?.let {
-        _uiState.value = it.copy(error = "")
+        _uiState.value = it.copy(error = "").contentValue()
     }
 
     private fun deleteTranscriptForTest() = uiState.contentState()?.let {
